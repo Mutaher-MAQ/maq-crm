@@ -157,8 +157,9 @@
   .link{color:var(--accent-text);cursor:pointer;font-weight:600;}
   .link:hover{text-decoration:underline;}
 
-  .auth-wrap{min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;}
-  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:32px;width:100%;max-width:360px;}
+  .auth-wrap{min-height:100vh;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px;}
+  .auth-illustration{width:100%;max-width:420px;height:auto;opacity:0.9;}
+  .auth-card{position:relative;z-index:1;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:32px;width:100%;max-width:360px;}
   .auth-error{background:var(--red-light);color:var(--red);padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
 </style>
 </head>
@@ -415,6 +416,7 @@ function renderLogin(){
       </form>
       <div class="sub-text" style="text-align:center;margin-top:16px;">Don't have an account? Ask your admin to invite you from the Supabase dashboard.</div>
     </div>
+    <img class="auth-illustration" src="https://www.maqint.com/images/evon.svg" alt="">
   </div>`;
 }
 
