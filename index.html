@@ -571,8 +571,9 @@ function renderOrders(){
   return `
   <div class="page-header">
     <div><h1 class="page-title">Orders & POs</h1><div class="page-subtitle">${state.opportunities.filter(o=>o.pipelineStage==='order').length} total</div></div>
-    <div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div>
+    <button class="btn" data-action="new-order">+ New Order</button>
   </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
@@ -835,7 +836,7 @@ function renderTaskForm(){
 function renderOpportunityForm(){
   const editing = modal.id ? state.opportunities.find(o=>o.id===modal.id) : null;
   const startStage = modal.startStage || (editing ? editing.pipelineStage : 'rfq');
-  const o = editing || {pipelineStage:startStage,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',contactMethod:'',rfqStatus:'not_started',winLose:'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
+  const o = editing || {pipelineStage:startStage,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',contactMethod:'',rfqStatus:'not_started',winLose: startStage==='order' ? 'won' : 'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
   const rfqDateVal = o.rfqDate ? new Date(o.rfqDate).toISOString().slice(0,10) : '';
   const poDateVal = o.poDate ? new Date(o.poDate).toISOString().slice(0,10) : '';
   const saleDateVal = o.saleDate ? new Date(o.saleDate).toISOString().slice(0,10) : '';
@@ -955,6 +956,7 @@ function attachGlobalHandlers(){
   bind('new-contact', ()=>{ modal={type:'contact-form', id:null}; render(); });
   bind('new-opportunity', ()=>{ modal={type:'opportunity-form', id:null, startStage:'rfq'}; render(); });
   bind('new-lead', ()=>{ modal={type:'opportunity-form', id:null, startStage:'lead'}; render(); });
+  bind('new-order', ()=>{ modal={type:'opportunity-form', id:null, startStage:'order'}; render(); });
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
 
   bind('open-customer', (el)=>{ modal={type:'customer-form', id:el.dataset.id}; render(); });
