@@ -12,6 +12,7 @@
     --amber:#d97706; --amber-light:#fef3c7;
     --red:#dc2626; --red-light:#fee2e2;
     --blue:#2563eb; --blue-light:#dbeafe;
+    --purple:#9333ea; --purple-light:#f3e8ff;
     --gray:#6b7280; --gray-light:#f1f2f6;
     --radius:10px;
     --shadow:0 1px 3px rgba(20,20,43,0.06), 0 1px 2px rgba(20,20,43,0.04);
@@ -21,13 +22,14 @@
   #app{display:flex;min-height:100vh;}
 
   /* Sidebar */
-  .sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;flex-shrink:0;}
-  .brand{display:flex;align-items:center;gap:10px;padding:0 20px 20px;font-weight:700;font-size:18px;color:var(--primary);border-bottom:1px solid var(--border);margin-bottom:14px;}
-  .brand-badge{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#818cf8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;}
-  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;color:var(--muted);cursor:pointer;font-size:14px;font-weight:500;border-left:3px solid transparent;}
+  .sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0;flex-shrink:0;overflow-y:auto;}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 20px 16px;font-weight:700;font-size:18px;color:var(--primary);border-bottom:1px solid var(--border);margin-bottom:10px;}
+  .brand-badge{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#818cf8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--muted);cursor:pointer;font-size:14px;font-weight:500;border-left:3px solid transparent;}
   .nav-item:hover{background:var(--gray-light);color:var(--text);}
   .nav-item.active{background:var(--primary-light);color:var(--primary);border-left-color:var(--primary);}
   .nav-icon{width:18px;text-align:center;}
+  .nav-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);opacity:0.7;padding:14px 20px 4px;}
   .sidebar-footer{margin-top:auto;padding:14px 20px 0;border-top:1px solid var(--border);}
   .btn-ghost-sm{font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;padding:6px 0;}
   .btn-ghost-sm:hover{color:var(--red);}
@@ -93,7 +95,21 @@
   .badge-amber{background:var(--amber-light);color:var(--amber);}
   .badge-red{background:var(--red-light);color:var(--red);}
   .badge-blue{background:var(--blue-light);color:var(--blue);}
+  .badge-purple{background:var(--purple-light);color:var(--purple);}
   .badge-gray{background:var(--gray-light);color:var(--gray);}
+
+  /* Kanban */
+  .kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;}
+  .kanban-col{background:#eef0f6;border-radius:var(--radius);min-width:240px;width:240px;flex-shrink:0;display:flex;flex-direction:column;max-height:calc(100vh - 200px);}
+  .kanban-col-header{padding:12px 14px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid;white-space:nowrap;}
+  .kanban-col-body{padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;min-height:60px;}
+  .kanban-col-body.drag-over{background:#e0e3f0;}
+  .kanban-card{background:#fff;border-radius:8px;padding:12px;box-shadow:var(--shadow);cursor:grab;border:1px solid var(--border);}
+  .kanban-card:active{cursor:grabbing;}
+  .kanban-card.dragging{opacity:0.4;}
+  .kanban-card-title{font-weight:600;font-size:13px;margin-bottom:6px;}
+  .kanban-card-sub{font-size:11px;color:var(--muted);margin-bottom:6px;}
+  .kanban-card-meta{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;}
 
   /* Modal */
   .modal-backdrop{position:fixed;inset:0;background:rgba(20,20,43,0.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
@@ -101,8 +117,8 @@
   .modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);}
   .modal-header h3{margin:0;font-size:16px;}
   .modal-body{padding:20px 22px;}
-  .modal-footer{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;}
-  .modal-footer-right{display:flex;gap:10px;margin-left:auto;}
+  .modal-footer{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .modal-footer-right{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;}
   .close-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);}
   .close-x:hover{color:var(--text);}
 
@@ -124,10 +140,10 @@
   .toast.show{opacity:1;transform:translateY(0);}
 
   .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:12px;}
-  .bar-label{width:90px;flex-shrink:0;color:var(--muted);font-weight:600;}
+  .bar-label{width:110px;flex-shrink:0;color:var(--muted);font-weight:600;}
   .bar-track{flex:1;background:var(--gray-light);border-radius:6px;height:18px;overflow:hidden;position:relative;}
   .bar-fill{height:100%;border-radius:6px;background:var(--primary);transition:width 0.4s;}
-  .bar-value{width:70px;text-align:right;flex-shrink:0;font-weight:700;}
+  .bar-value{width:36px;text-align:right;flex-shrink:0;font-weight:700;}
 
   .link{color:var(--primary);cursor:pointer;font-weight:600;}
   .link:hover{text-decoration:underline;}
@@ -148,18 +164,13 @@ const SUPABASE_URL = 'https://flbzcafkbypexdgfujqm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsYnpjYWZrYnlwZXhkZ2Z1anFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MDczMjYsImV4cCI6MjEwMzM4MzMyNn0.lRaIhw68JB3zq7-YML0Kfv4qh3EQAoh6CVFHKFAC1qM';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ---------------- Reference data ---------------- */
+/* ---------------- Reference data (mirrors the ClickUp Sales pipeline) ---------------- */
 const OPPORTUNITY_TYPES = [
-  {id:'new', label:'New'},
-  {id:'replacement', label:'Replacement'},
-  {id:'upgrade', label:'Upgrade'},
-  {id:'aftersales', label:'Aftersales'},
-  {id:'services', label:'Services'},
+  {id:'new', label:'New'}, {id:'replacement', label:'Replacement'}, {id:'upgrade', label:'Upgrade'},
+  {id:'aftersales', label:'Aftersales'}, {id:'services', label:'Services'},
 ];
 const PRIORITIES = [
-  {id:'high', label:'High'},
-  {id:'medium', label:'Medium'},
-  {id:'low', label:'Low'},
+  {id:'urgent', label:'Urgent'}, {id:'high', label:'High'}, {id:'normal', label:'Normal'}, {id:'low', label:'Low'},
 ];
 const WIN_LOSE = [
   {id:'pending', label:'Pending', badge:'badge-gray'},
@@ -167,6 +178,7 @@ const WIN_LOSE = [
   {id:'lost', label:'Lost', badge:'badge-red'},
 ];
 const PAYMENT_TERMS = ['LC','CAD','Advance'];
+const CURRENCIES = ['USD','Euro','PKR'];
 const LC_STATUSES = [
   {id:'not_applicable', label:'N/A', badge:'badge-gray'},
   {id:'pending', label:'Pending', badge:'badge-amber'},
@@ -176,12 +188,41 @@ const SIMPLE_STATUSES = [
   {id:'pending', label:'Pending', badge:'badge-amber'},
   {id:'done', label:'Done', badge:'badge-green'},
 ];
+const LEAD_SOURCES = [{id:'referral', label:'Referral'}, {id:'existing_customer', label:'Existing Customer'}];
+const FOLLOW_UP_ACTIONS = [
+  {id:'email_follow_up', label:'Email Follow-Up'}, {id:'phone_call', label:'Phone Call'},
+  {id:'schedule_meeting', label:'Schedule Meeting'}, {id:'send_proposal', label:'Send Proposal'}, {id:'send_reminder', label:'Send Reminder'},
+];
+const COMMISSION_STATUSES = [
+  {id:'pending', label:'Pending'}, {id:'processed', label:'Processed'}, {id:'completed', label:'Completed'},
+  {id:'failed', label:'Failed'}, {id:'refunded', label:'Refunded'},
+];
+const LEAD_COLUMNS = [
+  {id:'to_do', label:'To Do', color:'#6b7280'},
+  {id:'in_progress', label:'In Progress', color:'#2563eb'},
+  {id:'qualified', label:'Qualified', color:'#16a34a'},
+  {id:'not_qualified', label:'Not Qualified', color:'#dc2626'},
+  {id:'not_now', label:'Not Now', color:'#9333ea'},
+];
+const RFQ_COLUMNS = [
+  {id:'not_started', label:'Not Started', color:'#dc2626'},
+  {id:'in_progress', label:'In Progress', color:'#2563eb'},
+  {id:'awaiting_response', label:'Awaiting Response', color:'#d97706'},
+  {id:'not_interested', label:'Not Interested', color:'#9333ea'},
+  {id:'won', label:'Won (drop to promote)', color:'#16a34a'},
+];
+const PAYMENT_COLUMNS = [
+  {id:'receivable', label:'Receivable', color:'#dc2626'},
+  {id:'in_progress', label:'In Progress', color:'#2563eb'},
+  {id:'received', label:'Received', color:'#16a34a'},
+];
 
 /* ---------------- State ---------------- */
-let state = {customers:[], principals:[], contacts:[], opportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
+let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
 let view = 'dashboard';
 let searchQuery = '';
 let modal = null; // {type, id}
+let dragCardId = null;
 
 let session = null;
 let authChecked = false;
@@ -190,6 +231,7 @@ let authLoading = false;
 let dataLoaded = false;
 
 /* ---------------- Auth & data bootstrap ---------------- */
+function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||''}; }
 function mapCustomerFromDb(r){ return {id:r.id, name:r.name, industry:r.industry||'', website:r.website||'', notes:r.notes||''}; }
 function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||''}; }
 function mapContactFromDb(r){ return {id:r.id, name:r.name, email:r.email||'', phone:r.phone||'', title:r.title||'', customerId:r.customer_id||'', notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
@@ -197,13 +239,19 @@ function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ?
 function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
 function mapOpportunityFromDb(r){
   return {
-    id:r.id, customerId:r.customer_id||'', projectName:r.project_name||'', opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
+    id:r.id, pipelineStage:r.pipeline_stage||'rfq',
+    customerId:r.customer_id||'', projectName:r.project_name||'', itemProduct:r.item_product||'', assignedTo:r.assigned_to||'',
+    leadStatus:r.lead_status||'to_do', leadSource:r.lead_source||'', leadScore:r.lead_score,
+    opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
     rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
+    followUpAction:r.follow_up_action||'', contactMethod:r.contact_method||'', rfqStatus:r.rfq_status||'not_started',
     winLose:r.win_lose||'pending', loseReason:r.lose_reason||'',
     ctrNumber:r.ctr_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
     currency:r.currency||'', poValue:Number(r.po_value)||0, paymentTerms:r.payment_terms||'', poPrincipalId:r.po_principal_id||'',
-    lcStatus:r.lc_status||'pending', shipmentStatus:r.shipment_status||'pending', paymentStatus:r.payment_status||'pending',
+    lcStatus:r.lc_status||'pending', shipmentStatus:r.shipment_status||'pending',
+    saleDate: r.sale_date ? new Date(r.sale_date+'T00:00:00').getTime() : null, paymentStatus:r.payment_status||'receivable',
+    commissionStatus:r.commission_status||'', commissionRate:r.commission_rate,
     notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()
   };
 }
@@ -218,7 +266,8 @@ function removeLocal(collection, id){
 }
 
 async function loadAllData(){
-  const [cu, pr, ct, op, opr, ta, ac] = await Promise.all([
+  const [pf, cu, pr, ct, op, opr, ta, ac] = await Promise.all([
+    sb.from('profiles').select('*'),
     sb.from('customers').select('*').order('name'),
     sb.from('principals').select('*').order('name'),
     sb.from('contacts').select('*').order('created_at', {ascending:false}),
@@ -227,6 +276,7 @@ async function loadAllData(){
     sb.from('tasks').select('*'),
     sb.from('activities').select('*'),
   ]);
+  state.profiles = (pf.data||[]).map(mapProfileFromDb);
   state.customers = (cu.data||[]).map(mapCustomerFromDb);
   state.principals = (pr.data||[]).map(mapPrincipalFromDb);
   state.contacts = (ct.data||[]).map(mapContactFromDb);
@@ -249,6 +299,7 @@ function applyRealtimeChange(collection, mapFn, payload){
 
 function subscribeRealtime(){
   sb.channel('crm-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'profiles'}, p=>applyRealtimeChange('profiles', mapProfileFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'customers'}, p=>applyRealtimeChange('customers', mapCustomerFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'principals'}, p=>applyRealtimeChange('principals', mapPrincipalFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'contacts'}, p=>applyRealtimeChange('contacts', mapContactFromDb, p))
@@ -275,7 +326,7 @@ sb.auth.onAuthStateChange((event, sess)=>{
   session = sess;
   authChecked = true;
   if(session && !dataLoaded){ bootstrap(); }
-  else if(!session){ dataLoaded=false; state={customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
+  else if(!session){ dataLoaded=false; state={profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
 });
 
 /* ---------------- Helpers ---------------- */
@@ -285,6 +336,7 @@ function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2
 function customerName(id){ const c = state.customers.find(x=>x.id===id); return c? c.name : '—'; }
 function principalName(id){ const p = state.principals.find(x=>x.id===id); return p? p.name : '—'; }
 function contactName(id){ const c = state.contacts.find(x=>x.id===id); return c? c.name : '—'; }
+function profileName(id){ const p = state.profiles.find(x=>x.id===id); return p? p.fullName : '—'; }
 function opportunityLabel(id){ const o = state.opportunities.find(x=>x.id===id); return o? (o.projectName || o.opportunityNumber || 'Opportunity') : '—'; }
 function typeLabel(id){ const t = OPPORTUNITY_TYPES.find(x=>x.id===id); return t? t.label : '—'; }
 function priorityLabel(id){ const p = PRIORITIES.find(x=>x.id===id); return p? p.label : '—'; }
@@ -304,24 +356,10 @@ function toast(msg){
 /* ---------------- Render root ---------------- */
 function render(){
   const app = document.getElementById('app');
-  if(!authChecked){
-    app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading…</div></div>`;
-    return;
-  }
-  if(!session){
-    app.innerHTML = renderLogin();
-    attachAuthHandlers();
-    return;
-  }
-  if(!dataLoaded){
-    app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading your CRM…</div></div>`;
-    return;
-  }
-  app.innerHTML = `
-    ${renderSidebar()}
-    <div class="main">${renderView()}</div>
-    ${modal ? renderModal() : ''}
-  `;
+  if(!authChecked){ app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading…</div></div>`; return; }
+  if(!session){ app.innerHTML = renderLogin(); attachAuthHandlers(); return; }
+  if(!dataLoaded){ app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading your CRM…</div></div>`; return; }
+  app.innerHTML = `${renderSidebar()}<div class="main">${renderView()}</div>${modal ? renderModal() : ''}`;
   attachGlobalHandlers();
 }
 
@@ -329,9 +367,7 @@ function renderLogin(){
   return `
   <div class="auth-wrap">
     <div class="auth-card">
-      <div class="brand" style="border:none;justify-content:center;margin-bottom:6px;">
-        <div class="brand-badge">M</div> MAQ CRM
-      </div>
+      <div class="brand" style="border:none;justify-content:center;margin-bottom:6px;"><div class="brand-badge">M</div> MAQ CRM</div>
       <div class="sub-text" style="text-align:center;margin-bottom:20px;">Sign in with the account your admin invited you with</div>
       ${authError ? `<div class="auth-error">${esc(authError)}</div>` : ''}
       <form id="login-form">
@@ -358,21 +394,27 @@ function attachAuthHandlers(){
 }
 
 function renderSidebar(){
-  const items = [
-    {id:'dashboard', icon:'📊', label:'Dashboard'},
-    {id:'opportunities', icon:'📋', label:'Opportunities'},
+  const pipelineItems = [
+    {id:'leads', icon:'🌱', label:'Leads'},
+    {id:'opportunities', icon:'📋', label:'RFQs / Opportunities'},
+    {id:'orders', icon:'📦', label:'Orders & POs'},
+    {id:'payments', icon:'💵', label:'Payment Tracker'},
+  ];
+  const otherItems = [
     {id:'customers', icon:'🏢', label:'Customers'},
     {id:'principals', icon:'🏭', label:'Principals'},
     {id:'contacts', icon:'👤', label:'Contacts'},
     {id:'tasks', icon:'✅', label:'Tasks'},
   ];
+  const navItem = i => `<div class="nav-item ${view===i.id?'active':''}" data-nav="${i.id}"><span class="nav-icon">${i.icon}</span> ${i.label}</div>`;
   return `
   <div class="sidebar">
     <div class="brand"><div class="brand-badge">M</div> MAQ CRM</div>
-    ${items.map(i => `
-      <div class="nav-item ${view===i.id?'active':''}" data-nav="${i.id}">
-        <span class="nav-icon">${i.icon}</span> ${i.label}
-      </div>`).join('')}
+    <div class="nav-item ${view==='dashboard'?'active':''}" data-nav="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+    <div class="nav-group-label">Sales Pipeline</div>
+    ${pipelineItems.map(navItem).join('')}
+    <div class="nav-group-label">Records</div>
+    ${otherItems.map(navItem).join('')}
     <div class="sidebar-footer">
       <div class="sub-text" style="margin-bottom:8px;word-break:break-all;">${esc(session.user.email)}</div>
       <button class="btn-ghost-sm" data-action="sign-out">Sign out</button>
@@ -383,7 +425,10 @@ function renderSidebar(){
 function renderView(){
   switch(view){
     case 'dashboard': return renderDashboard();
+    case 'leads': return renderLeads();
     case 'opportunities': return renderOpportunities();
+    case 'orders': return renderOrders();
+    case 'payments': return renderPayments();
     case 'customers': return renderCustomers();
     case 'principals': return renderPrincipals();
     case 'contacts': return renderContacts();
@@ -394,74 +439,53 @@ function renderView(){
 
 /* ---------------- Dashboard ---------------- */
 function renderDashboard(){
-  const open = state.opportunities.filter(o=>o.winLose==='pending');
+  const leads = state.opportunities.filter(o=>o.pipelineStage==='lead');
+  const openLeads = leads.filter(o=>!['not_qualified','not_now'].includes(o.leadStatus));
+  const rfqs = state.opportunities.filter(o=>o.pipelineStage==='rfq');
+  const openRfqs = rfqs.filter(o=>o.winLose==='pending');
   const won = state.opportunities.filter(o=>o.winLose==='won');
   const lost = state.opportunities.filter(o=>o.winLose==='lost');
   const wonValue = won.reduce((s,o)=>s+Number(o.poValue||0),0);
+  const orders = state.opportunities.filter(o=>o.pipelineStage==='order');
+  const actionNeeded = orders.filter(o=>o.lcStatus==='pending' || o.shipmentStatus==='pending');
+  const receivable = orders.filter(o=>o.paymentStatus!=='received');
+  const receivableValue = receivable.reduce((s,o)=>s+Number(o.poValue||0),0);
+
   const openTasks = state.tasks.filter(t=>!t.done);
   const overdueTasks = openTasks.filter(t=>t.dueDate && t.dueDate < Date.now());
-
-  const actionNeeded = won.filter(o=>o.lcStatus==='pending' || o.shipmentStatus==='pending' || o.paymentStatus==='pending');
-
-  const maxCount = Math.max(1, open.length, won.length, lost.length);
-  const outcomeBars = WIN_LOSE.map(w=>{
-    const count = state.opportunities.filter(o=>o.winLose===w.id).length;
-    return {label:w.label, count, pct: Math.round((count/maxCount)*100), color: w.id==='won'?'#16a34a':(w.id==='lost'?'#dc2626':'#6b7280')};
-  });
-
   const recentActivities = [...state.activities].sort((a,b)=>b.timestamp-a.timestamp).slice(0,6);
   const upcomingTasks = [...openTasks].sort((a,b)=>(a.dueDate||0)-(b.dueDate||0)).slice(0,6);
 
+  const maxCount = Math.max(1, openLeads.length, openRfqs.length, orders.length, receivable.length);
+  const funnelBars = [
+    {label:'Leads', count:openLeads.length, color:'#9333ea'},
+    {label:'Open RFQs', count:openRfqs.length, color:'#2563eb'},
+    {label:'Orders', count:orders.length, color:'#d97706'},
+    {label:'Awaiting Payment', count:receivable.length, color:'#dc2626'},
+  ];
+
   return `
-  <div class="page-header">
-    <div>
-      <h1 class="page-title">Dashboard</h1>
-      <div class="page-subtitle">Overview of your opportunities and activity</div>
-    </div>
-  </div>
+  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">Leads → RFQ → Order → Payment, at a glance</div></div></div>
 
   <div class="stat-grid">
-    <div class="stat-card">
-      <div class="stat-label">Open Opportunities</div>
-      <div class="stat-value">${open.length}</div>
-      <div class="stat-sub">awaiting win/lose decision</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Won</div>
-      <div class="stat-value">${won.length}</div>
-      <div class="stat-sub">total PO value ${fmtMoney(wonValue)}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Lost</div>
-      <div class="stat-value">${lost.length}</div>
-      <div class="stat-sub">${state.opportunities.length} total opportunities</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Open Tasks</div>
-      <div class="stat-value">${openTasks.length}</div>
-      <div class="stat-sub">${overdueTasks.length ? `<span style="color:var(--red)">${overdueTasks.length} overdue</span>` : 'all on track'}</div>
-    </div>
+    <div class="stat-card"><div class="stat-label">Open Leads</div><div class="stat-value">${openLeads.length}</div><div class="stat-sub">${leads.length} total</div></div>
+    <div class="stat-card"><div class="stat-label">Open RFQs</div><div class="stat-value">${openRfqs.length}</div><div class="stat-sub">${won.length} won · ${lost.length} lost</div></div>
+    <div class="stat-card"><div class="stat-label">Won Value</div><div class="stat-value">${fmtMoney(wonValue)}</div><div class="stat-sub">${won.length} order${won.length!==1?'s':''}</div></div>
+    <div class="stat-card"><div class="stat-label">Awaiting Payment</div><div class="stat-value">${fmtMoney(receivableValue)}</div><div class="stat-sub">${receivable.length} order${receivable.length!==1?'s':''}</div></div>
   </div>
 
   <div class="dash-grid">
     <div class="panel">
-      <div class="panel-title">Opportunities by Outcome</div>
-      ${outcomeBars.map(b=>`<div class="bar-row">
-          <div class="bar-label">${b.label}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${b.pct}%;background:${b.color}"></div></div>
-          <div class="bar-value">${b.count}</div>
-        </div>`).join('')}
-
-      <div class="panel-title" style="margin-top:22px;">Won — Action Needed</div>
+      <div class="panel-title">Pipeline Funnel</div>
+      ${funnelBars.map(b=>`<div class="bar-row"><div class="bar-label">${b.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round((b.count/maxCount)*100)}%;background:${b.color}"></div></div><div class="bar-value">${b.count}</div></div>`).join('')}
+      <div class="panel-title" style="margin-top:22px;">Orders — Action Needed</div>
       ${actionNeeded.length ? actionNeeded.map(o=>`
         <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
-          <div class="task-title">${esc(o.projectName || o.opportunityNumber || 'Opportunity')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
+          <div class="task-title">${esc(o.projectName||o.itemProduct||'Order')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
           ${o.lcStatus==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
           ${o.shipmentStatus==='pending' ? '<span class="badge badge-amber">Shipment pending</span>' : ''}
-          ${o.paymentStatus==='pending' ? '<span class="badge badge-amber">Payment pending</span>' : ''}
-        </div>`).join('') : `<div class="sub-text">Nothing pending — all won opportunities are clear 🎉</div>`}
+        </div>`).join('') : `<div class="sub-text">Nothing pending — all orders are clear 🎉</div>`}
     </div>
-
     <div class="panel">
       <div class="panel-title">Upcoming Tasks</div>
       ${upcomingTasks.length ? upcomingTasks.map(t=>`
@@ -470,69 +494,134 @@ function renderDashboard(){
           <div class="task-title">${esc(t.title)}<div class="sub-text">${t.contactId?contactName(t.contactId):(t.opportunityId?opportunityLabel(t.opportunityId):'')}</div></div>
           <span class="badge ${t.dueDate && t.dueDate<Date.now() ? 'badge-red':'badge-gray'}">${fmtDate(t.dueDate)}</span>
         </div>`).join('') : `<div class="sub-text">No upcoming tasks 🎉</div>`}
-
       <div class="panel-title" style="margin-top:22px;">Recent Activity</div>
       ${recentActivities.length ? recentActivities.map(a=>`
-        <div class="activity-item">
-          <div class="activity-dot"></div>
-          <div>
-            <div><b>${a.contactId?contactName(a.contactId):opportunityLabel(a.opportunityId)}</b> — ${esc(a.note)}</div>
-            <div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div>
-          </div>
+        <div class="activity-item"><div class="activity-dot"></div>
+          <div><div><b>${a.contactId?contactName(a.contactId):opportunityLabel(a.opportunityId)}</b> — ${esc(a.note)}</div><div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div></div>
         </div>`).join('') : `<div class="sub-text">No activity yet</div>`}
     </div>
   </div>
   `;
 }
-function activityIcon(type){
-  return {call:'📞',email:'✉️',meeting:'🗓️',note:'📝'}[type] || '•';
+function activityIcon(type){ return {call:'📞',email:'✉️',meeting:'🗓️',note:'📝'}[type] || '•'; }
+
+/* ---------------- Leads (Kanban) ---------------- */
+function renderLeads(){
+  const leads = state.opportunities.filter(o=>o.pipelineStage==='lead');
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Leads</h1><div class="page-subtitle">${leads.length} total · raw inquiries not yet confirmed as opportunities</div></div>
+    <button class="btn" data-action="new-lead">+ New Lead</button>
+  </div>
+  <div class="kanban">
+    ${LEAD_COLUMNS.map(col=>{
+      const cards = leads.filter(o=>o.leadStatus===col.id);
+      return `<div class="kanban-col">
+        <div class="kanban-col-header" style="border-color:${col.color}"><span>${col.label} <span class="sub-text">(${cards.length})</span></span></div>
+        <div class="kanban-col-body" data-board="leads" data-col="${col.id}">
+          ${cards.map(o=>`
+            <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
+              <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled Lead')}</div>
+              <div class="kanban-card-sub">${esc(customerName(o.customerId))}${o.itemProduct?' · '+esc(o.itemProduct):''}</div>
+              <div class="kanban-card-meta"><span>${o.leadSource?LEAD_SOURCES.find(s=>s.id===o.leadSource).label:''}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  `;
 }
 
-/* ---------------- Opportunities ---------------- */
+/* ---------------- Opportunities / RFQ (Kanban) ---------------- */
 function renderOpportunities(){
+  const rfqs = state.opportunities.filter(o=>o.pipelineStage==='rfq');
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">RFQs / Opportunities</h1><div class="page-subtitle">${rfqs.length} total · drag a card to "Won" to promote it to Orders & POs</div></div>
+    <button class="btn" data-action="new-opportunity">+ New Opportunity</button>
+  </div>
+  <div class="kanban">
+    ${RFQ_COLUMNS.map(col=>{
+      const cards = col.id==='won' ? [] : rfqs.filter(o=>o.rfqStatus===col.id && o.winLose!=='lost') ;
+      const list = col.id==='not_interested' ? rfqs.filter(o=>o.winLose==='lost' || o.rfqStatus==='not_interested') : cards;
+      return `<div class="kanban-col">
+        <div class="kanban-col-header" style="border-color:${col.color}"><span>${col.label} <span class="sub-text">(${list.length})</span></span></div>
+        <div class="kanban-col-body" data-board="rfq" data-col="${col.id}">
+          ${list.map(o=>`
+            <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
+              <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled')}</div>
+              <div class="kanban-card-sub">${esc(customerName(o.customerId))} · RFQ# ${esc(o.rfqNumber||'—')}</div>
+              <div class="kanban-card-meta"><span class="badge badge-gray">${priorityLabel(o.priority)}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  `;
+}
+
+/* ---------------- Orders & POs (table) ---------------- */
+function renderOrders(){
   const q = searchQuery.toLowerCase();
-  const rows = state.opportunities.filter(o =>
-    !q || (o.projectName||'').toLowerCase().includes(q) || (o.opportunityNumber||'').toLowerCase().includes(q) ||
-    (o.rfqNumber||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
-  ).sort((a,b)=>b.createdAt-a.createdAt);
+  const rows = state.opportunities.filter(o => o.pipelineStage==='order' && (
+    !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) ||
+    (o.itemProduct||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
+  )).sort((a,b)=>b.createdAt-a.createdAt);
 
   return `
   <div class="page-header">
-    <div><h1 class="page-title">Opportunities</h1><div class="page-subtitle">${state.opportunities.length} total</div></div>
-    <button class="btn" data-action="new-opportunity">+ New Opportunity</button>
-  </div>
-  <div class="toolbar">
-    <div class="search-box"><input type="text" placeholder="Search opportunities..." value="${esc(searchQuery)}" data-action="search"></div>
+    <div><h1 class="page-title">Orders & POs</h1><div class="page-subtitle">${state.opportunities.filter(o=>o.pipelineStage==='order').length} total</div></div>
+    <div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div>
   </div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr>
-        <th>Customer / Project</th><th>Type</th><th>RFQ #</th><th>Priority</th><th>Outcome</th>
-        <th>PO #</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Payment</th><th></th>
-      </tr></thead>
+      <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(o=>{
-          const wl = winLoseInfo(o.winLose);
-          const lc = lcStatusInfo(o.lcStatus);
-          const sh = simpleStatusInfo(o.shipmentStatus);
-          const pa = simpleStatusInfo(o.paymentStatus);
+          const lc = lcStatusInfo(o.lcStatus); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
-            <td>${esc(typeLabel(o.opportunityType))}</td>
-            <td>${esc(o.rfqNumber||'—')}</td>
-            <td>${esc(priorityLabel(o.priority))}</td>
-            <td><span class="badge ${wl.badge}">${wl.label}</span></td>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
             <td>${esc(o.poNumber||'—')}</td>
+            <td>${esc(o.ctrNumber||'—')}</td>
+            <td>${esc(principalName(o.poPrincipalId))}</td>
             <td>${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
             <td><span class="badge ${lc.badge}">${lc.label}</span></td>
             <td><span class="badge ${sh.badge}">${sh.label}</span></td>
-            <td><span class="badge ${pa.badge}">${pa.label}</span></td>
+            <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-opportunity" data-id="${o.id}">🗑️</button></td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="11">No opportunities found. <span class="link" data-action="new-opportunity">Add one</span></td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="9">No orders yet — win an RFQ to see it here.</td></tr>`}
       </tbody>
     </table>
+  </div>
+  `;
+}
+
+/* ---------------- Payment Tracker (Kanban) ---------------- */
+function renderPayments(){
+  const orders = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Payment Tracker</h1><div class="page-subtitle">${orders.length} won order${orders.length!==1?'s':''} · commission tracked per payment</div></div>
+  </div>
+  <div class="kanban">
+    ${PAYMENT_COLUMNS.map(col=>{
+      const cards = orders.filter(o=>o.paymentStatus===col.id);
+      const total = cards.reduce((s,o)=>s+Number(o.poValue||0),0);
+      return `<div class="kanban-col">
+        <div class="kanban-col-header" style="border-color:${col.color}"><span>${col.label} <span class="sub-text">(${cards.length})</span></span><span>${fmtMoney(total)}</span></div>
+        <div class="kanban-col-body" data-board="payment" data-col="${col.id}">
+          ${cards.map(o=>`
+            <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
+              <div class="kanban-card-title">${esc(customerName(o.customerId))}</div>
+              <div class="kanban-card-sub">PO# ${esc(o.poNumber||'—')}</div>
+              <div class="kanban-card-title" style="color:var(--primary)">${fmtMoney(o.poValue, o.currency)}</div>
+              <div class="kanban-card-meta">${o.commissionStatus ? `<span class="badge badge-purple">Commission: ${COMMISSION_STATUSES.find(c=>c.id===o.commissionStatus).label}</span>` : ''}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
   </div>
   `;
 }
@@ -541,29 +630,23 @@ function renderOpportunities(){
 function renderCustomers(){
   const q = searchQuery.toLowerCase();
   const rows = state.customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.industry||'').toLowerCase().includes(q));
-
   return `
   <div class="page-header">
     <div><h1 class="page-title">Customers</h1><div class="page-subtitle">${state.customers.length} total</div></div>
     <button class="btn" data-action="new-customer">+ New Customer</button>
   </div>
-  <div class="toolbar">
-    <div class="search-box"><input type="text" placeholder="Search customers..." value="${esc(searchQuery)}" data-action="search"></div>
-  </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search customers..." value="${esc(searchQuery)}" data-action="search"></div></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Customer</th><th>Industry</th><th>Website</th><th>Contacts</th><th>Open Opportunities</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(c=>{
           const contactCount = state.contacts.filter(p=>p.customerId===c.id).length;
-          const oppCount = state.opportunities.filter(o=>o.customerId===c.id && o.winLose==='pending').length;
+          const oppCount = state.opportunities.filter(o=>o.customerId===c.id && o.pipelineStage!=='order').length;
           return `
           <tr data-action="open-customer" data-id="${c.id}">
             <td><div class="name-cell"><div class="avatar">${initials(c.name)}</div><div>${esc(c.name)}</div></div></td>
-            <td>${esc(c.industry||'—')}</td>
-            <td>${esc(c.website||'—')}</td>
-            <td>${contactCount}</td>
-            <td>${oppCount}</td>
+            <td>${esc(c.industry||'—')}</td><td>${esc(c.website||'—')}</td><td>${contactCount}</td><td>${oppCount}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-customer" data-id="${c.id}">🗑️</button></td>
           </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="6">No customers found. <span class="link" data-action="new-customer">Add one</span></td></tr>`}
@@ -577,15 +660,12 @@ function renderCustomers(){
 function renderPrincipals(){
   const q = searchQuery.toLowerCase();
   const rows = state.principals.filter(p => !q || p.name.toLowerCase().includes(q));
-
   return `
   <div class="page-header">
     <div><h1 class="page-title">Principals</h1><div class="page-subtitle">${state.principals.length} total · the OEM manufacturers you represent</div></div>
     <button class="btn" data-action="new-principal">+ New Principal</button>
   </div>
-  <div class="toolbar">
-    <div class="search-box"><input type="text" placeholder="Search principals..." value="${esc(searchQuery)}" data-action="search"></div>
-  </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search principals..." value="${esc(searchQuery)}" data-action="search"></div></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Principal</th><th>Notes</th><th>Linked Opportunities</th><th></th></tr></thead>
@@ -595,8 +675,7 @@ function renderPrincipals(){
           return `
           <tr data-action="open-principal" data-id="${p.id}">
             <td><div class="name-cell"><div class="avatar">${initials(p.name)}</div><div>${esc(p.name)}</div></div></td>
-            <td class="sub-text">${esc(p.notes||'—')}</td>
-            <td>${oppCount}</td>
+            <td class="sub-text">${esc(p.notes||'—')}</td><td>${oppCount}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-principal" data-id="${p.id}">🗑️</button></td>
           </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="4">No principals found. <span class="link" data-action="new-principal">Add one</span></td></tr>`}
@@ -609,18 +688,13 @@ function renderPrincipals(){
 /* ---------------- Contacts ---------------- */
 function renderContacts(){
   const q = searchQuery.toLowerCase();
-  const rows = state.contacts.filter(c =>
-    !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)
-  ).sort((a,b)=>b.createdAt-a.createdAt);
-
+  const rows = state.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)).sort((a,b)=>b.createdAt-a.createdAt);
   return `
   <div class="page-header">
     <div><h1 class="page-title">Contacts</h1><div class="page-subtitle">${state.contacts.length} total</div></div>
     <button class="btn" data-action="new-contact">+ New Contact</button>
   </div>
-  <div class="toolbar">
-    <div class="search-box"><input type="text" placeholder="Search contacts..." value="${esc(searchQuery)}" data-action="search"></div>
-  </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search contacts..." value="${esc(searchQuery)}" data-action="search"></div></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Name</th><th>Customer</th><th>Email</th><th>Phone</th><th></th></tr></thead>
@@ -628,9 +702,7 @@ function renderContacts(){
         ${rows.length ? rows.map(c=>`
           <tr data-action="open-contact" data-id="${c.id}">
             <td><div class="name-cell"><div class="avatar">${initials(c.name)}</div><div><div>${esc(c.name)}</div><div class="sub-text">${esc(c.title||'')}</div></div></div></td>
-            <td>${esc(customerName(c.customerId))}</td>
-            <td>${esc(c.email||'—')}</td>
-            <td>${esc(c.phone||'—')}</td>
+            <td>${esc(customerName(c.customerId))}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-contact" data-id="${c.id}">🗑️</button></td>
           </tr>`).join('') : `<tr class="empty-row"><td colspan="5">No contacts found. <span class="link" data-action="new-contact">Add one</span></td></tr>`}
       </tbody>
@@ -641,10 +713,7 @@ function renderContacts(){
 
 /* ---------------- Tasks ---------------- */
 function renderTasks(){
-  const sorted = [...state.tasks].sort((a,b)=>{
-    if(a.done !== b.done) return a.done ? 1 : -1;
-    return (a.dueDate||0) - (b.dueDate||0);
-  });
+  const sorted = [...state.tasks].sort((a,b)=>{ if(a.done !== b.done) return a.done ? 1 : -1; return (a.dueDate||0) - (b.dueDate||0); });
   return `
   <div class="page-header">
     <div><h1 class="page-title">Tasks</h1><div class="page-subtitle">${state.tasks.filter(t=>!t.done).length} open</div></div>
@@ -666,21 +735,11 @@ function renderTasks(){
 }
 
 /* ---------------- Modals ---------------- */
-function customerOptions(selectedId){
-  return `<option value="">—</option>` + state.customers.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
-}
-function principalOptions(selectedId){
-  return `<option value="">—</option>` + state.principals.map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${esc(p.name)}</option>`).join('');
-}
-function contactOptions(selectedId){
-  return `<option value="">—</option>` + state.contacts.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
-}
-function opportunityOptions(selectedId){
-  return `<option value="">—</option>` + state.opportunities.map(o=>`<option value="${o.id}" ${o.id===selectedId?'selected':''}>${esc(o.projectName||o.opportunityNumber||'Untitled')}</option>`).join('');
-}
-function optionList(list, selectedId){
-  return `<option value="">—</option>` + list.map(x=>`<option value="${x.id}" ${x.id===selectedId?'selected':''}>${esc(x.label)}</option>`).join('');
-}
+function customerOptions(selectedId){ return `<option value="">—</option>` + state.customers.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join(''); }
+function principalOptions(selectedId){ return `<option value="">—</option>` + state.principals.map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${esc(p.name)}</option>`).join(''); }
+function contactOptions(selectedId){ return `<option value="">—</option>` + state.contacts.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join(''); }
+function opportunityOptions(selectedId){ return `<option value="">—</option>` + state.opportunities.map(o=>`<option value="${o.id}" ${o.id===selectedId?'selected':''}>${esc(o.projectName||o.opportunityNumber||'Untitled')}</option>`).join(''); }
+function profileOptions(selectedId){ return `<option value="">—</option>` + state.profiles.map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${esc(p.fullName)}</option>`).join(''); }
 
 function renderModal(){
   const {type} = modal;
@@ -711,10 +770,7 @@ function renderCustomerForm(){
   return modalShell(editing?'Edit Customer':'New Customer', `
     <form id="customer-form">
       <div class="field"><label>Customer Name *</label><input name="name" required value="${esc(c.name)}"></div>
-      <div class="field-row">
-        <div class="field"><label>Industry</label><input name="industry" value="${esc(c.industry)}"></div>
-        <div class="field"><label>Website</label><input name="website" value="${esc(c.website)}"></div>
-      </div>
+      <div class="field-row"><div class="field"><label>Industry</label><input name="industry" value="${esc(c.industry)}"></div><div class="field"><label>Website</label><input name="website" value="${esc(c.website)}"></div></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(c.notes)}</textarea></div>
     </form>
     ${editing && (relatedContacts.length || relatedOpps.length) ? `
@@ -723,10 +779,7 @@ function renderCustomerForm(){
     ` : ''}
   `, `
     <div>${editing?`<button class="btn btn-danger" data-action="delete-customer" data-id="${editing.id}">Delete</button>`:''}</div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-customer" data-id="${editing?editing.id:''}">Save</button>
-    </div>
+    <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-customer" data-id="${editing?editing.id:''}">Save</button></div>
   `);
 }
 
@@ -742,10 +795,7 @@ function renderPrincipalForm(){
     ${editing && relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Linked Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} — ${esc(customerName(o.customerId))}</div>`).join('')}</div>` : ''}
   `, `
     <div>${editing?`<button class="btn btn-danger" data-action="delete-principal" data-id="${editing.id}">Delete</button>`:''}</div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-principal" data-id="${editing?editing.id:''}">Save</button>
-    </div>
+    <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-principal" data-id="${editing?editing.id:''}">Save</button></div>
   `);
 }
 
@@ -755,22 +805,13 @@ function renderContactForm(){
   return modalShell(editing?'Edit Contact':'New Contact', `
     <form id="contact-form">
       <div class="field"><label>Full Name *</label><input name="name" required value="${esc(c.name)}"></div>
-      <div class="field-row">
-        <div class="field"><label>Email</label><input name="email" type="email" value="${esc(c.email)}"></div>
-        <div class="field"><label>Phone</label><input name="phone" value="${esc(c.phone)}"></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Title</label><input name="title" value="${esc(c.title)}"></div>
-        <div class="field"><label>Customer</label><select name="customerId">${customerOptions(c.customerId)}</select></div>
-      </div>
+      <div class="field-row"><div class="field"><label>Email</label><input name="email" type="email" value="${esc(c.email)}"></div><div class="field"><label>Phone</label><input name="phone" value="${esc(c.phone)}"></div></div>
+      <div class="field-row"><div class="field"><label>Title</label><input name="title" value="${esc(c.title)}"></div><div class="field"><label>Customer</label><select name="customerId">${customerOptions(c.customerId)}</select></div></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(c.notes)}</textarea></div>
     </form>
   `, `
     <div>${editing?`<button class="btn btn-danger" data-action="delete-contact" data-id="${editing.id}">Delete</button>`:''}</div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-contact" data-id="${editing?editing.id:''}">Save</button>
-    </div>
+    <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-contact" data-id="${editing?editing.id:''}">Save</button></div>
   `);
 }
 
@@ -781,69 +822,78 @@ function renderTaskForm(){
   return modalShell(editing?'Edit Task':'New Task', `
     <form id="task-form">
       <div class="field"><label>Task *</label><input name="title" required value="${esc(t.title)}"></div>
-      <div class="field-row">
-        <div class="field"><label>Due Date</label><input name="dueDate" type="date" value="${dueDateVal}"></div>
-        <div class="field"><label>Related Contact</label><select name="contactId">${contactOptions(t.contactId)}</select></div>
-      </div>
+      <div class="field-row"><div class="field"><label>Due Date</label><input name="dueDate" type="date" value="${dueDateVal}"></div><div class="field"><label>Related Contact</label><select name="contactId">${contactOptions(t.contactId)}</select></div></div>
       <div class="field"><label>Related Opportunity</label><select name="opportunityId">${opportunityOptions(t.opportunityId)}</select></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(t.notes)}</textarea></div>
     </form>
   `, `
     <div>${editing?`<button class="btn btn-danger" data-action="delete-task" data-id="${editing.id}">Delete</button>`:''}</div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-task" data-id="${editing?editing.id:''}">Save</button>
-    </div>
+    <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-task" data-id="${editing?editing.id:''}">Save</button></div>
   `);
 }
 
 function renderOpportunityForm(){
   const editing = modal.id ? state.opportunities.find(o=>o.id===modal.id) : null;
-  const o = editing || {customerId:'',projectName:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',winLose:'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',paymentStatus:'pending',notes:''};
+  const startStage = modal.startStage || (editing ? editing.pipelineStage : 'rfq');
+  const o = editing || {pipelineStage:startStage,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',contactMethod:'',rfqStatus:'not_started',winLose:'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
   const rfqDateVal = o.rfqDate ? new Date(o.rfqDate).toISOString().slice(0,10) : '';
   const poDateVal = o.poDate ? new Date(o.poDate).toISOString().slice(0,10) : '';
+  const saleDateVal = o.saleDate ? new Date(o.saleDate).toISOString().slice(0,10) : '';
   const selectedPrincipals = editing ? opportunityPrincipalIds(editing.id) : [];
   const acts = editing ? state.activities.filter(a=>a.opportunityId===editing.id).sort((a,b)=>b.timestamp-a.timestamp) : [];
+  const isLead = o.pipelineStage === 'lead';
+  const isOrder = o.pipelineStage === 'order';
 
-  return modalShell(editing?'Edit Opportunity':'New Opportunity', `
-    <form id="opportunity-form">
-      <div class="form-section-title">Opportunity Details</div>
+  return modalShell(editing?'Edit '+(isLead?'Lead':(isOrder?'Order':'Opportunity')):(isLead?'New Lead':'New Opportunity'), `
+    <form id="opportunity-form" data-stage="${o.pipelineStage}">
       <div class="field"><label>Customer</label><select name="customerId">${customerOptions(o.customerId)}</select></div>
-      <div class="field"><label>Project Name / Description</label><input name="projectName" value="${esc(o.projectName)}"></div>
+      <div class="field-row">
+        <div class="field"><label>Project / Description</label><input name="projectName" value="${esc(o.projectName)}"></div>
+        <div class="field"><label>Item / Product</label><input name="itemProduct" value="${esc(o.itemProduct)}"></div>
+      </div>
+      <div class="field"><label>Assigned To</label><select name="assignedTo">${profileOptions(o.assignedTo)}</select></div>
+
+      ${isLead ? `
+      <div class="form-section-title">Lead</div>
+      <div class="field-row">
+        <div class="field"><label>Lead Source</label><select name="leadSource"><option value="">—</option>${LEAD_SOURCES.map(s=>`<option value="${s.id}" ${s.id===o.leadSource?'selected':''}>${s.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Lead Score</label><input name="leadScore" type="number" value="${esc(o.leadScore)}"></div>
+      </div>
+      <div class="field"><label>Lead Status</label><select name="leadStatus">${LEAD_COLUMNS.map(s=>`<option value="${s.id}" ${s.id===o.leadStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+      ` : `
+      <div class="form-section-title">RFQ</div>
       <div class="field-row">
         <div class="field"><label>Opportunity Type</label><select name="opportunityType"><option value="">—</option>${OPPORTUNITY_TYPES.map(t=>`<option value="${t.id}" ${t.id===o.opportunityType?'selected':''}>${t.label}</option>`).join('')}</select></div>
         <div class="field"><label>Opportunity Number</label><input name="opportunityNumber" value="${esc(o.opportunityNumber)}"></div>
       </div>
-      <div class="field"><label>Principals (OEMs involved — select multiple)</label>
-        <select name="principalIds" multiple size="4">${state.principals.map(p=>`<option value="${p.id}" ${selectedPrincipals.includes(p.id)?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
-      </div>
-
-      <div class="form-section-title">RFQ</div>
+      <div class="field"><label>Principals (OEMs involved — select multiple)</label><select name="principalIds" multiple size="4">${state.principals.map(p=>`<option value="${p.id}" ${selectedPrincipals.includes(p.id)?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
       <div class="field-row">
         <div class="field"><label>RFQ #</label><input name="rfqNumber" value="${esc(o.rfqNumber)}"></div>
         <div class="field"><label>OEM Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
       </div>
-      <div class="field">
-        <label>RFQ Date</label><input name="rfqDate" type="date" value="${rfqDateVal}">
-        <div class="checkbox-row"><input type="checkbox" name="rfqDateEstimated" id="rfqDateEstimated" ${o.rfqDateEstimated?'checked':''}><label for="rfqDateEstimated" style="margin:0;">Estimated / expected date, not confirmed</label></div>
+      <div class="field"><label>RFQ Date</label><input name="rfqDate" type="date" value="${rfqDateVal}">
+        <div class="checkbox-row"><input type="checkbox" name="rfqDateEstimated" id="rfqDateEstimated" ${o.rfqDateEstimated?'checked':''}><label for="rfqDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
-      <div class="field"><label>Priority</label><select name="priority"><option value="">—</option>${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===o.priority?'selected':''}>${p.label}</option>`).join('')}</select></div>
+      <div class="field-row">
+        <div class="field"><label>Priority</label><select name="priority"><option value="">—</option>${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===o.priority?'selected':''}>${p.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Follow-Up Action</label><select name="followUpAction"><option value="">—</option>${FOLLOW_UP_ACTIONS.map(f=>`<option value="${f.id}" ${f.id===o.followUpAction?'selected':''}>${f.label}</option>`).join('')}</select></div>
+      </div>
+      <div class="field"><label>Contact Method</label><input name="contactMethod" value="${esc(o.contactMethod)}"></div>
+      ${!isOrder ? `<div class="field"><label>RFQ Status</label><select name="rfqStatus">${RFQ_COLUMNS.filter(c=>c.id!=='won').map(s=>`<option value="${s.id}" ${s.id===o.rfqStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>` : ''}
+      <div class="field-row">
+        <div class="field"><label>Outcome</label><select name="winLose">${WIN_LOSE.map(w=>`<option value="${w.id}" ${w.id===o.winLose?'selected':''}>${w.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Lose Reason (if lost)</label><input name="loseReason" value="${esc(o.loseReason)}"></div>
+      </div>
+      `}
 
-      <div class="form-section-title">Win / Lose</div>
-      <div class="field"><label>Outcome</label><select name="winLose">${WIN_LOSE.map(w=>`<option value="${w.id}" ${w.id===o.winLose?'selected':''}>${w.label}</option>`).join('')}</select></div>
-      <div class="field"><label>Lose Reason (if lost)</label><input name="loseReason" value="${esc(o.loseReason)}"></div>
-
+      ${isOrder ? `
       <div class="form-section-title">Purchase Order</div>
-      <div class="field-row">
-        <div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div>
-        <div class="field"><label>PO #</label><input name="poNumber" value="${esc(o.poNumber)}"></div>
-      </div>
-      <div class="field">
-        <label>PO Date</label><input name="poDate" type="date" value="${poDateVal}">
-        <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date, not confirmed</label></div>
+      <div class="field-row"><div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div><div class="field"><label>PO #</label><input name="poNumber" value="${esc(o.poNumber)}"></div></div>
+      <div class="field"><label>PO Date</label><input name="poDate" type="date" value="${poDateVal}">
+        <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Currency</label><input name="currency" placeholder="USD" value="${esc(o.currency)}"></div>
+        <div class="field"><label>Currency</label><select name="currency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
         <div class="field"><label>PO Value</label><input name="poValue" type="number" min="0" step="0.01" value="${esc(o.poValue)}"></div>
       </div>
       <div class="field-row">
@@ -854,7 +904,17 @@ function renderOpportunityForm(){
         <div class="field"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.lcStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
         <div class="field"><label>Shipment Status</label><select name="shipmentStatus">${SIMPLE_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.shipmentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
       </div>
-      <div class="field"><label>Payment Status</label><select name="paymentStatus">${SIMPLE_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.paymentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+
+      <div class="form-section-title">Payment / Commission</div>
+      <div class="field-row">
+        <div class="field"><label>Sale Date</label><input name="saleDate" type="date" value="${saleDateVal}"></div>
+        <div class="field"><label>Payment Status</label><select name="paymentStatus">${PAYMENT_COLUMNS.map(s=>`<option value="${s.id}" ${s.id===o.paymentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Commission Status</label><select name="commissionStatus"><option value="">—</option>${COMMISSION_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.commissionStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Commission Rate</label><input name="commissionRate" type="number" min="0" step="0.01" value="${esc(o.commissionRate)}"></div>
+      </div>
+      ` : ''}
 
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(o.notes)}</textarea></div>
     </form>
@@ -862,28 +922,21 @@ function renderOpportunityForm(){
     ${editing ? `
     <div class="form-section-title">Log an Activity</div>
     <form id="activity-form" style="display:flex;gap:8px;">
-      <select name="type" style="max-width:110px">
-        <option value="call">📞 Call</option>
-        <option value="email">✉️ Email</option>
-        <option value="meeting">🗓️ Meeting</option>
-        <option value="note">📝 Note</option>
-      </select>
+      <select name="type" style="max-width:110px"><option value="call">📞 Call</option><option value="email">✉️ Email</option><option value="meeting">🗓️ Meeting</option><option value="note">📝 Note</option></select>
       <input name="note" placeholder="What happened?" required>
       <button class="btn btn-sm" data-action="add-opportunity-activity" data-id="${editing.id}" type="submit">Add</button>
     </form>
     <div class="detail-section" style="margin-top:14px;">
       <div class="detail-label">Activity Timeline</div>
-      ${acts.length ? acts.map(a=>`
-        <div class="activity-item"><div class="activity-dot"></div>
-          <div><div>${esc(a.note)}</div><div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div></div>
-        </div>`).join('') : `<div class="sub-text">No activity logged yet.</div>`}
+      ${acts.length ? acts.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div><div>${esc(a.note)}</div><div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div></div></div>`).join('') : `<div class="sub-text">No activity logged yet.</div>`}
     </div>
     ` : ''}
   `, `
     <div>${editing?`<button class="btn btn-danger" data-action="delete-opportunity" data-id="${editing.id}">Delete</button>`:''}</div>
     <div class="modal-footer-right">
+      ${editing && isLead ? `<button class="btn btn-secondary" data-action="promote-lead" data-id="${editing.id}">Promote to RFQ →</button>` : ''}
       <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-opportunity" data-id="${editing?editing.id:''}">Save</button>
+      <button class="btn" data-action="save-opportunity" data-id="${editing?editing.id:''}" data-stage="${o.pipelineStage}">Save</button>
     </div>
   `, true);
 }
@@ -892,22 +945,16 @@ function renderOpportunityForm(){
 function attachGlobalHandlers(){
   const app = document.getElementById('app');
 
-  app.querySelectorAll('[data-nav]').forEach(el=>{
-    el.addEventListener('click', ()=>{ view = el.dataset.nav; searchQuery=''; modal=null; render(); });
-  });
+  app.querySelectorAll('[data-nav]').forEach(el=>{ el.addEventListener('click', ()=>{ view = el.dataset.nav; searchQuery=''; modal=null; render(); }); });
+  app.querySelectorAll('[data-action="search"]').forEach(el=>{ el.addEventListener('input', ()=>{ searchQuery = el.value; render(); restoreFocus(el); }); });
 
-  app.querySelectorAll('[data-action="search"]').forEach(el=>{
-    el.addEventListener('input', ()=>{ searchQuery = el.value; render(); restoreFocus(el); });
-  });
-
-  bind('sign-out', async ()=>{
-    await sb.auth.signOut();
-  });
+  bind('sign-out', async ()=>{ await sb.auth.signOut(); });
 
   bind('new-customer', ()=>{ modal={type:'customer-form', id:null}; render(); });
   bind('new-principal', ()=>{ modal={type:'principal-form', id:null}; render(); });
   bind('new-contact', ()=>{ modal={type:'contact-form', id:null}; render(); });
-  bind('new-opportunity', ()=>{ modal={type:'opportunity-form', id:null}; render(); });
+  bind('new-opportunity', ()=>{ modal={type:'opportunity-form', id:null, startStage:'rfq'}; render(); });
+  bind('new-lead', ()=>{ modal={type:'opportunity-form', id:null, startStage:'lead'}; render(); });
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
 
   bind('open-customer', (el)=>{ modal={type:'customer-form', id:el.dataset.id}; render(); });
@@ -917,6 +964,15 @@ function attachGlobalHandlers(){
   bind('open-task', (el)=>{ modal={type:'task-form', id:el.dataset.id}; render(); });
 
   bind('close-modal', ()=>{ modal=null; render(); });
+
+  bind('promote-lead', async (el)=>{
+    const id = el.dataset.id;
+    const payload = {pipeline_stage:'rfq', rfq_status:'not_started'};
+    const {data, error} = await sb.from('opportunities').update(payload).eq('id', id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    modal=null; render(); toast('Promoted to RFQ');
+  });
 
   bind('delete-customer', async (el)=>{
     if(!confirm('Delete this customer? Related contacts and opportunities will be unlinked.')) return;
@@ -940,11 +996,11 @@ function attachGlobalHandlers(){
     removeLocal('contacts', id); modal=null; render(); toast('Contact deleted');
   });
   bind('delete-opportunity', async (el)=>{
-    if(!confirm('Delete this opportunity?')) return;
+    if(!confirm('Delete this record?')) return;
     const id = el.dataset.id;
     const {error} = await sb.from('opportunities').delete().eq('id', id);
     if(error){ toast('Error: '+error.message); return; }
-    removeLocal('opportunities', id); modal=null; render(); toast('Opportunity deleted');
+    removeLocal('opportunities', id); modal=null; render(); toast('Deleted');
   });
   bind('delete-task', async (el)=>{
     const id = el.dataset.id;
@@ -954,8 +1010,7 @@ function attachGlobalHandlers(){
   });
 
   bind('toggle-task', async (el)=>{
-    const id = el.dataset.id;
-    const done = el.checked;
+    const id = el.dataset.id; const done = el.checked;
     const {data, error} = await sb.from('tasks').update({done}).eq('id', id).select().single();
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('tasks', mapTaskFromDb(data)); render();
@@ -1005,11 +1060,7 @@ function attachGlobalHandlers(){
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
-    const payload = {
-      title:fd.get('title').trim(),
-      due_date: fd.get('dueDate') || null,
-      contact_id:fd.get('contactId')||null, opportunity_id:fd.get('opportunityId')||null, notes:fd.get('notes').trim()||null
-    };
+    const payload = {title:fd.get('title').trim(), due_date: fd.get('dueDate') || null, contact_id:fd.get('contactId')||null, opportunity_id:fd.get('opportunityId')||null, notes:fd.get('notes').trim()||null};
     const q = id ? sb.from('tasks').update(payload).eq('id', id) : sb.from('tasks').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
@@ -1022,45 +1073,67 @@ function attachGlobalHandlers(){
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
+    const stage = el.dataset.stage;
     const payload = {
+      pipeline_stage: stage,
       customer_id: fd.get('customerId')||null,
       project_name: fd.get('projectName').trim()||null,
-      opportunity_type: fd.get('opportunityType')||null,
-      opportunity_number: fd.get('opportunityNumber').trim()||null,
-      rfq_number: fd.get('rfqNumber').trim()||null,
-      rfq_date: fd.get('rfqDate')||null,
-      rfq_date_estimated: fd.get('rfqDateEstimated')==='on',
-      oem_reference_number: fd.get('oemReferenceNumber').trim()||null,
-      priority: fd.get('priority')||null,
-      win_lose: fd.get('winLose'),
-      lose_reason: fd.get('loseReason').trim()||null,
-      ctr_number: fd.get('ctrNumber').trim()||null,
-      po_number: fd.get('poNumber').trim()||null,
-      po_date: fd.get('poDate')||null,
-      po_date_estimated: fd.get('poDateEstimated')==='on',
-      currency: fd.get('currency').trim()||null,
-      po_value: fd.get('poValue') ? Number(fd.get('poValue')) : null,
-      payment_terms: fd.get('paymentTerms')||null,
-      po_principal_id: fd.get('poPrincipalId')||null,
-      lc_status: fd.get('lcStatus'),
-      shipment_status: fd.get('shipmentStatus'),
-      payment_status: fd.get('paymentStatus'),
-      notes: fd.get('notes').trim()||null
+      item_product: fd.get('itemProduct').trim()||null,
+      assigned_to: fd.get('assignedTo')||null,
+      notes: fd.get('notes').trim()||null,
     };
+    if(stage === 'lead'){
+      payload.lead_source = fd.get('leadSource')||null;
+      payload.lead_score = fd.get('leadScore') ? Number(fd.get('leadScore')) : null;
+      payload.lead_status = fd.get('leadStatus');
+    } else {
+      payload.opportunity_type = fd.get('opportunityType')||null;
+      payload.opportunity_number = fd.get('opportunityNumber').trim()||null;
+      payload.rfq_number = fd.get('rfqNumber').trim()||null;
+      payload.rfq_date = fd.get('rfqDate')||null;
+      payload.rfq_date_estimated = fd.get('rfqDateEstimated')==='on';
+      payload.oem_reference_number = fd.get('oemReferenceNumber').trim()||null;
+      payload.priority = fd.get('priority')||null;
+      payload.follow_up_action = fd.get('followUpAction')||null;
+      payload.contact_method = fd.get('contactMethod').trim()||null;
+      payload.win_lose = fd.get('winLose');
+      payload.lose_reason = fd.get('loseReason').trim()||null;
+      if(stage !== 'order'){
+        payload.rfq_status = fd.get('rfqStatus');
+        // Winning an RFQ promotes it straight to Orders & POs
+        if(payload.win_lose === 'won'){ payload.pipeline_stage = 'order'; }
+      }
+      if(stage === 'order' || payload.pipeline_stage === 'order'){
+        payload.ctr_number = fd.get('ctrNumber').trim()||null;
+        payload.po_number = fd.get('poNumber').trim()||null;
+        payload.po_date = fd.get('poDate')||null;
+        payload.po_date_estimated = fd.get('poDateEstimated')==='on';
+        payload.currency = fd.get('currency')||null;
+        payload.po_value = fd.get('poValue') ? Number(fd.get('poValue')) : null;
+        payload.payment_terms = fd.get('paymentTerms')||null;
+        payload.po_principal_id = fd.get('poPrincipalId')||null;
+        payload.lc_status = fd.get('lcStatus') || 'pending';
+        payload.shipment_status = fd.get('shipmentStatus') || 'pending';
+        payload.sale_date = fd.get('saleDate')||null;
+        payload.payment_status = fd.get('paymentStatus') || 'receivable';
+        payload.commission_status = fd.get('commissionStatus')||null;
+        payload.commission_rate = fd.get('commissionRate') ? Number(fd.get('commissionRate')) : null;
+      }
+    }
     const q = id ? sb.from('opportunities').update(payload).eq('id', id) : sb.from('opportunities').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
     const savedOpp = mapOpportunityFromDb(data);
     upsertLocal('opportunities', savedOpp);
 
-    const principalIds = Array.from(form.principalIds.selectedOptions).map(o=>o.value);
-    await sb.from('opportunity_principals').delete().eq('opportunity_id', savedOpp.id);
-    if(principalIds.length){
-      await sb.from('opportunity_principals').insert(principalIds.map(pid=>({opportunity_id:savedOpp.id, principal_id:pid})));
+    if(form.principalIds){
+      const principalIds = Array.from(form.principalIds.selectedOptions).map(o=>o.value);
+      await sb.from('opportunity_principals').delete().eq('opportunity_id', savedOpp.id);
+      if(principalIds.length){ await sb.from('opportunity_principals').insert(principalIds.map(pid=>({opportunity_id:savedOpp.id, principal_id:pid}))); }
+      await reloadOpportunityPrincipals();
     }
-    await reloadOpportunityPrincipals();
 
-    modal=null; render(); toast('Opportunity saved');
+    modal=null; render(); toast(payload.pipeline_stage==='order' && stage!=='order' ? 'Won! Moved to Orders & POs' : 'Saved');
   });
 
   bind('add-opportunity-activity', async (el)=>{
@@ -1074,6 +1147,36 @@ function attachGlobalHandlers(){
     upsertLocal('activities', mapActivityFromDb(data));
     render();
   }, 'submit', true);
+
+  /* Kanban drag & drop, shared across Leads / RFQ / Payment boards */
+  app.querySelectorAll('.kanban-card').forEach(card=>{
+    card.addEventListener('dragstart', ()=>{ dragCardId = card.dataset.id; card.classList.add('dragging'); });
+    card.addEventListener('dragend', ()=>{ card.classList.remove('dragging'); });
+  });
+  app.querySelectorAll('.kanban-col-body').forEach(col=>{
+    col.addEventListener('dragover', (e)=>{ e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', ()=>{ col.classList.remove('drag-over'); });
+    col.addEventListener('drop', async (e)=>{
+      e.preventDefault(); col.classList.remove('drag-over');
+      const board = col.dataset.board; const colId = col.dataset.col;
+      const opp = state.opportunities.find(o=>o.id===dragCardId);
+      if(!opp) return;
+      let payload = null;
+      if(board==='leads' && opp.leadStatus!==colId){ payload = {lead_status:colId}; }
+      else if(board==='rfq'){
+        if(colId==='won'){ payload = {win_lose:'won', pipeline_stage:'order'}; }
+        else if(colId==='not_interested'){ payload = {rfq_status:'not_interested', win_lose:'lost'}; }
+        else if(opp.rfqStatus!==colId || opp.winLose!=='pending'){ payload = {rfq_status:colId, win_lose:'pending'}; }
+      }
+      else if(board==='payment' && opp.paymentStatus!==colId){ payload = {payment_status:colId}; }
+      if(!payload) return;
+      Object.assign(opp, board==='leads'?{leadStatus:colId}:(board==='rfq'?{rfqStatus:colId}:{paymentStatus:colId}));
+      render();
+      const {data, error} = await sb.from('opportunities').update(payload).eq('id', dragCardId).select().single();
+      if(error){ toast('Error: '+error.message); return; }
+      upsertLocal('opportunities', mapOpportunityFromDb(data)); render();
+    });
+  });
 }
 
 function bind(action, handler, eventType='click', preventDefault){
@@ -1085,11 +1188,7 @@ function bind(action, handler, eventType='click', preventDefault){
     });
   });
 }
-function restoreFocus(el){
-  const val = el.value;
-  el.focus();
-  el.setSelectionRange(val.length, val.length);
-}
+function restoreFocus(el){ const val = el.value; el.focus(); el.setSelectionRange(val.length, val.length); }
 
 render();
 </script>
