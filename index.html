@@ -4,35 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAQ CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#f5f6fa; --panel:#ffffff; --border:#e3e6ee; --text:#1c2333; --muted:#6b7280;
-    --primary:#4f46e5; --primary-dark:#4338ca; --primary-light:#eef2ff;
+    --bg:#f4f6f9; --panel:#ffffff; --border:#e3e6ee; --text:#212529; --muted:#6b7280;
+    --primary:#14171a; --primary-dark:#000000; --primary-light:rgba(59,193,235,0.14);
+    --accent:#3bc1eb; --accent-text:#0e7fa1;
     --green:#16a34a; --green-light:#dcfce7;
     --amber:#d97706; --amber-light:#fef3c7;
     --red:#dc2626; --red-light:#fee2e2;
     --blue:#2563eb; --blue-light:#dbeafe;
     --purple:#9333ea; --purple-light:#f3e8ff;
     --gray:#6b7280; --gray-light:#f1f2f6;
+    --sidebar-bg:#0b0d10; --sidebar-active-bg:#1c2024; --sidebar-muted:#8b97ad; --sidebar-text:#f5f7fa;
     --radius:10px;
     --shadow:0 1px 3px rgba(20,20,43,0.06), 0 1px 2px rgba(20,20,43,0.04);
   }
   *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
   #app{display:flex;min-height:100vh;}
 
   /* Sidebar */
-  .sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0;flex-shrink:0;overflow-y:auto;}
-  .brand{display:flex;align-items:center;gap:10px;padding:0 20px 16px;font-weight:700;font-size:18px;color:var(--primary);border-bottom:1px solid var(--border);margin-bottom:10px;}
-  .brand-badge{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#818cf8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
-  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--muted);cursor:pointer;font-size:14px;font-weight:500;border-left:3px solid transparent;}
-  .nav-item:hover{background:var(--gray-light);color:var(--text);}
-  .nav-item.active{background:var(--primary-light);color:var(--primary);border-left-color:var(--primary);}
+  .sidebar{width:224px;background:var(--sidebar-bg);display:flex;flex-direction:column;padding:16px 0;flex-shrink:0;overflow-y:auto;}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;}
+  .brand-logo{flex-shrink:0;display:block;}
+  .brand-tag{font-size:9px;font-weight:700;letter-spacing:0.09em;color:var(--sidebar-muted);border:1px solid rgba(255,255,255,0.18);border-radius:4px;padding:2px 6px;white-space:nowrap;}
+  .brand-logo.on-light path{fill:#14171a;}
+  .brand-tag.on-light{color:var(--muted);border-color:var(--border);}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--sidebar-muted);cursor:pointer;font-size:14px;font-weight:500;border-left:3px solid transparent;}
+  .nav-item:hover{background:rgba(255,255,255,0.05);color:var(--sidebar-text);}
+  .nav-item.active{background:var(--sidebar-active-bg);color:var(--sidebar-text);border-left-color:var(--accent);}
   .nav-icon{width:18px;text-align:center;}
-  .nav-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);opacity:0.7;padding:14px 20px 4px;}
-  .sidebar-footer{margin-top:auto;padding:14px 20px 0;border-top:1px solid var(--border);}
-  .btn-ghost-sm{font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;padding:6px 0;}
-  .btn-ghost-sm:hover{color:var(--red);}
+  .nav-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--sidebar-muted);opacity:0.6;padding:14px 20px 4px;}
+  .sidebar-footer{margin-top:auto;padding:14px 20px 0;border-top:1px solid rgba(255,255,255,0.08);}
+  .sidebar-footer .sub-text{color:var(--sidebar-muted);}
+  .btn-ghost-sm{font-size:12px;color:var(--sidebar-muted);background:none;border:none;cursor:pointer;padding:6px 0;}
+  .btn-ghost-sm:hover{color:var(--accent);}
 
   /* Main */
   .main{flex:1;padding:26px 32px;overflow-x:hidden;max-width:100%;}
@@ -145,7 +154,7 @@
   .bar-fill{height:100%;border-radius:6px;background:var(--primary);transition:width 0.4s;}
   .bar-value{width:36px;text-align:right;flex-shrink:0;font-weight:700;}
 
-  .link{color:var(--primary);cursor:pointer;font-weight:600;}
+  .link{color:var(--accent-text);cursor:pointer;font-weight:600;}
   .link:hover{text-decoration:underline;}
 
   .auth-wrap{min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;}
@@ -163,6 +172,35 @@
 const SUPABASE_URL = 'https://flbzcafkbypexdgfujqm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsYnpjYWZrYnlwZXhkZ2Z1anFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MDczMjYsImV4cCI6MjEwMzM4MzMyNn0.lRaIhw68JB3zq7-YML0Kfv4qh3EQAoh6CVFHKFAC1qM';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ---------------- Brand logo (from maqint.com) ---------------- */
+function maqLogo(width, extraClass){
+  const h = Math.round(width * (26.36/203.387));
+  return `<svg class="brand-logo ${extraClass||''}" width="${width}" height="${h}" viewBox="0 0 203.387 26.36" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(-186.113 -38)">
+<g transform="translate(186.113 38)">
+<g transform="translate(0 0.957)"><path d="M42.64,588.592h8.484l8.706-17.8a1.819,1.819,0,0,1,2.039-.523,1.233,1.233,0,0,1,.824,1.789l-7.823,16.53h7.439l9.145-17.685a2,2,0,0,1,2.067-.442,1.245,1.245,0,0,1,.771,1.71l-8.044,16.418H73.8l10.22-19.061c1.558-2.905-.546-5.759-3.76-6.091H61.414c-3.985.332-7.538,1.9-9.235,5.414Z" transform="translate(-42.64 -563.44)" fill="#fff"/></g>
+<g transform="translate(34.131 0.132)"><path d="M79.094,588.536l19.751-25.977h9.916L106.2,588.536H99.175v-4.159l-5.7-.083,4.628-6.776h2.231v-5.371l-12.56,16.389Z" transform="translate(-79.094 -562.559)" fill="#fff"/></g>
+<g transform="translate(63.077)"><path d="M138.019,562.5l-9.688-.08a10.984,10.984,0,0,0-9.7,5.651l-8.1,14.594a4.118,4.118,0,0,0,3.647,6.115l22.335-.251,4.381-9.283-6.777.081,6.87-11.552a3.492,3.492,0,0,0-2.971-5.276M125.03,580.234h-4.256l5.206-9.3h4.462Z" transform="translate(-110.01 -562.418)" fill="#fff"/></g>
+</g>
+<g transform="translate(285.396 53.481)">
+<path d="M40.86,605.671l2.2-10.5h2.158l-2.193,10.5Z" transform="translate(-40.86 -595.172)" fill="#fff"/>
+<path d="M47.782,597.982h1.95l-.2.989a5.29,5.29,0,0,1,1.363-.9,3.4,3.4,0,0,1,1.336-.269,2.007,2.007,0,0,1,1.479.538,1.922,1.922,0,0,1,.541,1.425,8.89,8.89,0,0,1-.236,1.519l-.9,4.3H51.063l.9-4.32a9.178,9.178,0,0,0,.2-1.152.827.827,0,0,0-.232-.621.9.9,0,0,0-.647-.225,1.819,1.819,0,0,0-1,.38,2.634,2.634,0,0,0-.868,1,8.7,8.7,0,0,0-.517,1.811l-.651,3.124H46.193Z" transform="translate(-46.193 -597.802)" fill="#fff"/>
+<path d="M56.63,599.583l.314-1.527h1l.25-1.217,2.357-1.418L60,598.055h1.253l-.316,1.527h-1.26l-.667,3.188q-.178.867-.179.989a.471.471,0,0,0,.151.37.849.849,0,0,0,.545.131c.09,0,.317-.014.681-.048l-.324,1.525a5.472,5.472,0,0,1-1.089.107,2.434,2.434,0,0,1-1.583-.419,1.448,1.448,0,0,1-.494-1.165,11,11,0,0,1,.266-1.618l.638-3.059Z" transform="translate(-56.63 -595.421)" fill="#fff"/>
+<path d="M69.54,602.422H64.381c0,.08-.006.143-.006.187a1.735,1.735,0,0,0,.433,1.225,1.4,1.4,0,0,0,1.059.465,1.76,1.76,0,0,0,1.6-1.061l1.839.31a3.862,3.862,0,0,1-1.436,1.663,3.745,3.745,0,0,1-2.014.556,3.355,3.355,0,0,1-2.494-.971,3.493,3.493,0,0,1-.961-2.567,4.666,4.666,0,0,1,.868-2.778,3.9,3.9,0,0,1,3.372-1.649,2.931,2.931,0,0,1,2.221.864,3.355,3.355,0,0,1,.825,2.418,5.748,5.748,0,0,1-.143,1.338m-1.732-1.253c0-.09.006-.161.006-.208a1.849,1.849,0,0,0-.38-1.266,1.3,1.3,0,0,0-1.018-.422,1.612,1.612,0,0,0-1.141.478,2.563,2.563,0,0,0-.684,1.419Z" transform="translate(-62.398 -597.802)" fill="#fff"/>
+<path d="M72.807,597.982h1.919l-.308,1.477a2.939,2.939,0,0,1,2.327-1.656,2.416,2.416,0,0,1,.952.222l-.786,1.684a1.784,1.784,0,0,0-.6-.1,1.84,1.84,0,0,0-1.078.4,2.7,2.7,0,0,0-.854,1.071,10.713,10.713,0,0,0-.609,2.124l-.5,2.385H71.216Z" transform="translate(-71.216 -597.802)" fill="#fff"/>
+<path d="M79.758,597.982h1.948l-.2.989a5.294,5.294,0,0,1,1.364-.9,3.4,3.4,0,0,1,1.336-.269,2.007,2.007,0,0,1,1.479.538,1.918,1.918,0,0,1,.541,1.425,9,9,0,0,1-.236,1.519l-.894,4.3H83.039l.9-4.32a9.177,9.177,0,0,0,.2-1.152.827.827,0,0,0-.232-.621.908.908,0,0,0-.649-.225,1.81,1.81,0,0,0-1,.38,2.617,2.617,0,0,0-.868,1,8.584,8.584,0,0,0-.516,1.811l-.651,3.124H78.168Z" transform="translate(-78.168 -597.802)" fill="#fff"/>
+<path d="M91,600.137,89,599.965a3.022,3.022,0,0,1,1.2-1.59,4.009,4.009,0,0,1,2.268-.573,3.328,3.328,0,0,1,2.171.59,1.826,1.826,0,0,1,.7,1.443,4.5,4.5,0,0,1-.061.732q-.06.387-.426,2.034a10.428,10.428,0,0,0-.3,1.906,3.887,3.887,0,0,0,.172,1.081h-2a3.933,3.933,0,0,1-.149-.859,3.163,3.163,0,0,1-1.038.77,2.82,2.82,0,0,1-1.183.269,2.11,2.11,0,0,1-1.561-.62,2.16,2.16,0,0,1-.616-1.594,2.3,2.3,0,0,1,.677-1.74,3.931,3.931,0,0,1,2.417-.787,9.723,9.723,0,0,0,1.963-.294,2.563,2.563,0,0,0,.13-.689.7.7,0,0,0-.267-.552,1.205,1.205,0,0,0-.785-.219,1.487,1.487,0,0,0-.871.223,1.132,1.132,0,0,0-.434.642m1.955,1.9a4.242,4.242,0,0,1-.494.092,4.755,4.755,0,0,0-2.019.545.831.831,0,0,0-.337.7.807.807,0,0,0,.258.606.948.948,0,0,0,.68.245,1.8,1.8,0,0,0,.878-.224,1.548,1.548,0,0,0,.616-.581,3.868,3.868,0,0,0,.361-1.107Z" transform="translate(-88.172 -597.802)" fill="#fff"/>
+<path d="M97.788,599.583l.315-1.527h1l.252-1.217,2.355-1.418-.551,2.634h1.253l-.315,1.527h-1.261l-.665,3.188a9.8,9.8,0,0,0-.181.989.475.475,0,0,0,.151.37.845.845,0,0,0,.545.131c.09,0,.317-.014.68-.048l-.322,1.525a5.5,5.5,0,0,1-1.088.107,2.425,2.425,0,0,1-1.584-.419,1.445,1.445,0,0,1-.5-1.165,10.911,10.911,0,0,1,.267-1.618l.637-3.059Z" transform="translate(-97.788 -595.421)" fill="#fff"/>
+<path d="M104.891,598.065h2.057l-1.591,7.606H103.3Zm.6-2.893h2.057l-.386,1.862h-2.057Z" transform="translate(-103.302 -595.172)" fill="#fff"/>
+<path d="M108.822,602.429a4.688,4.688,0,0,1,1.192-3.369,4.123,4.123,0,0,1,3.134-1.258,3.59,3.59,0,0,1,2.628.927,3.337,3.337,0,0,1,.945,2.5,4.68,4.68,0,0,1-1.181,3.195,4,4,0,0,1-3.167,1.346,4.048,4.048,0,0,1-1.9-.43,2.773,2.773,0,0,1-1.239-1.217,3.6,3.6,0,0,1-.409-1.69m5.86-1.468a1.618,1.618,0,0,0-.427-1.17,1.459,1.459,0,0,0-1.1-.441,1.841,1.841,0,0,0-1.183.413,2.644,2.644,0,0,0-.8,1.194,4.2,4.2,0,0,0-.287,1.445,1.832,1.832,0,0,0,.444,1.3,1.457,1.457,0,0,0,1.118.478,1.739,1.739,0,0,0,1.418-.722,3.868,3.868,0,0,0,.818-2.492" transform="translate(-108.822 -597.802)" fill="#fff"/>
+<path d="M120.11,597.982h1.948l-.2.989a5.307,5.307,0,0,1,1.363-.9,3.409,3.409,0,0,1,1.338-.269,2,2,0,0,1,1.478.538,1.917,1.917,0,0,1,.541,1.425,9,9,0,0,1-.236,1.519l-.895,4.3h-2.056l.9-4.32a9.626,9.626,0,0,0,.2-1.152.828.828,0,0,0-.233-.621.9.9,0,0,0-.648-.225,1.819,1.819,0,0,0-1,.38,2.658,2.658,0,0,0-.867,1,8.52,8.52,0,0,0-.516,1.811l-.651,3.124h-2.056Z" transform="translate(-118.521 -597.802)" fill="#fff"/>
+<path d="M131.354,600.137l-2.007-.172a3.043,3.043,0,0,1,1.2-1.59,4.007,4.007,0,0,1,2.267-.573,3.332,3.332,0,0,1,2.171.59,1.827,1.827,0,0,1,.7,1.443,4.878,4.878,0,0,1-.061.732q-.06.387-.426,2.034a10.487,10.487,0,0,0-.3,1.906,3.966,3.966,0,0,0,.172,1.081h-2a3.814,3.814,0,0,1-.152-.859,3.153,3.153,0,0,1-1.038.77,2.816,2.816,0,0,1-1.182.269,2.106,2.106,0,0,1-1.561-.62,2.164,2.164,0,0,1-.616-1.594,2.3,2.3,0,0,1,.677-1.74,3.93,3.93,0,0,1,2.416-.787,9.7,9.7,0,0,0,1.964-.294,2.514,2.514,0,0,0,.129-.689.7.7,0,0,0-.265-.552,1.212,1.212,0,0,0-.787-.219,1.489,1.489,0,0,0-.871.223,1.136,1.136,0,0,0-.433.642m1.955,1.9a4.118,4.118,0,0,1-.494.092,4.749,4.749,0,0,0-2.018.545.83.83,0,0,0-.338.7.814.814,0,0,0,.257.606.949.949,0,0,0,.682.245,1.8,1.8,0,0,0,.877-.224,1.548,1.548,0,0,0,.616-.581,3.931,3.931,0,0,0,.362-1.107Z" transform="translate(-128.526 -597.802)" fill="#fff"/>
+<path d="M137.627,605.671l2.2-10.5h2.049l-2.193,10.5Z" transform="translate(-137.627 -595.172)" fill="#fff"/>
+</g>
+</g>
+</svg>`;
+}
 
 /* ---------------- Reference data (mirrors the ClickUp Sales pipeline) ---------------- */
 const OPPORTUNITY_TYPES = [
@@ -367,7 +405,7 @@ function renderLogin(){
   return `
   <div class="auth-wrap">
     <div class="auth-card">
-      <div class="brand" style="border:none;justify-content:center;margin-bottom:6px;"><div class="brand-badge">M</div> MAQ CRM</div>
+      <div class="brand" style="border:none;justify-content:center;margin-bottom:6px;">${maqLogo(140,'on-light')}<span class="brand-tag on-light">CRM</span></div>
       <div class="sub-text" style="text-align:center;margin-bottom:20px;">Sign in with the account your admin invited you with</div>
       ${authError ? `<div class="auth-error">${esc(authError)}</div>` : ''}
       <form id="login-form">
@@ -409,7 +447,7 @@ function renderSidebar(){
   const navItem = i => `<div class="nav-item ${view===i.id?'active':''}" data-nav="${i.id}"><span class="nav-icon">${i.icon}</span> ${i.label}</div>`;
   return `
   <div class="sidebar">
-    <div class="brand"><div class="brand-badge">M</div> MAQ CRM</div>
+    <div class="brand">${maqLogo(128)}<span class="brand-tag">CRM</span></div>
     <div class="nav-item ${view==='dashboard'?'active':''}" data-nav="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
     <div class="nav-group-label">Sales Pipeline</div>
     ${pipelineItems.map(navItem).join('')}
