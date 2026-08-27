@@ -53,6 +53,10 @@
   label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
   .field{margin-bottom:14px;}
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--muted);}
+  .checkbox-row input{width:auto;}
+  .form-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--primary);margin:20px 0 12px;padding-top:14px;border-top:1px solid var(--border);}
+  .form-section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
 
   .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
   .search-box{position:relative;flex:1;min-width:200px;max-width:320px;}
@@ -74,39 +78,26 @@
 
   /* Table */
   table{width:100%;border-collapse:collapse;font-size:14px;}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);}
-  td{padding:12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:12px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
   tr:last-child td{border-bottom:none;}
   tbody tr:hover{background:var(--gray-light);cursor:pointer;}
-  .empty-row td{text-align:center;color:var(--muted);padding:36px;cursor:default;}
+  .empty-row td{text-align:center;color:var(--muted);padding:36px;cursor:default;white-space:normal;}
   .empty-row:hover td{background:none;}
 
   .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;}
   .name-cell{display:flex;align-items:center;gap:10px;}
   .sub-text{font-size:12px;color:var(--muted);}
-  .badge{display:inline-block;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700;white-space:nowrap;}
   .badge-green{background:var(--green-light);color:var(--green);}
   .badge-amber{background:var(--amber-light);color:var(--amber);}
   .badge-red{background:var(--red-light);color:var(--red);}
   .badge-blue{background:var(--blue-light);color:var(--blue);}
   .badge-gray{background:var(--gray-light);color:var(--gray);}
 
-  /* Kanban */
-  .kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;}
-  .kanban-col{background:#eef0f6;border-radius:var(--radius);min-width:250px;width:250px;flex-shrink:0;display:flex;flex-direction:column;max-height:calc(100vh - 180px);}
-  .kanban-col-header{padding:12px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid;}
-  .kanban-col-body{padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;}
-  .kanban-col-body.drag-over{background:#e0e3f0;}
-  .deal-card{background:#fff;border-radius:8px;padding:12px;box-shadow:var(--shadow);cursor:grab;border:1px solid var(--border);}
-  .deal-card:active{cursor:grabbing;}
-  .deal-card.dragging{opacity:0.4;}
-  .deal-title{font-weight:600;font-size:13px;margin-bottom:6px;}
-  .deal-value{font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px;}
-  .deal-meta{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;}
-
   /* Modal */
   .modal-backdrop{position:fixed;inset:0;background:rgba(20,20,43,0.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
-  .modal{background:#fff;border-radius:12px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+  .modal{background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
   .modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);}
   .modal-header h3{margin:0;font-size:16px;}
   .modal-body{padding:20px 22px;}
@@ -157,21 +148,40 @@ const SUPABASE_URL = 'https://flbzcafkbypexdgfujqm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsYnpjYWZrYnlwZXhkZ2Z1anFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MDczMjYsImV4cCI6MjEwMzM4MzMyNn0.lRaIhw68JB3zq7-YML0Kfv4qh3EQAoh6CVFHKFAC1qM';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ---------------- State ---------------- */
-const STAGES = [
-  {id:'lead', label:'Lead', color:'#6b7280'},
-  {id:'qualified', label:'Qualified', color:'#2563eb'},
-  {id:'proposal', label:'Proposal', color:'#d97706'},
-  {id:'negotiation', label:'Negotiation', color:'#9333ea'},
-  {id:'won', label:'Won', color:'#16a34a'},
-  {id:'lost', label:'Lost', color:'#dc2626'},
+/* ---------------- Reference data ---------------- */
+const OPPORTUNITY_TYPES = [
+  {id:'new', label:'New'},
+  {id:'replacement', label:'Replacement'},
+  {id:'upgrade', label:'Upgrade'},
+  {id:'aftersales', label:'Aftersales'},
+  {id:'services', label:'Services'},
+];
+const PRIORITIES = [
+  {id:'high', label:'High'},
+  {id:'medium', label:'Medium'},
+  {id:'low', label:'Low'},
+];
+const WIN_LOSE = [
+  {id:'pending', label:'Pending', badge:'badge-gray'},
+  {id:'won', label:'Won', badge:'badge-green'},
+  {id:'lost', label:'Lost', badge:'badge-red'},
+];
+const PAYMENT_TERMS = ['LC','CAD','Advance'];
+const LC_STATUSES = [
+  {id:'not_applicable', label:'N/A', badge:'badge-gray'},
+  {id:'pending', label:'Pending', badge:'badge-amber'},
+  {id:'done', label:'Done', badge:'badge-green'},
+];
+const SIMPLE_STATUSES = [
+  {id:'pending', label:'Pending', badge:'badge-amber'},
+  {id:'done', label:'Done', badge:'badge-green'},
 ];
 
-let state = {companies:[], contacts:[], deals:[], tasks:[], activities:[]};
+/* ---------------- State ---------------- */
+let state = {customers:[], principals:[], contacts:[], opportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
 let view = 'dashboard';
 let searchQuery = '';
 let modal = null; // {type, id}
-let dragDealId = null;
 
 let session = null;
 let authChecked = false;
@@ -180,11 +190,23 @@ let authLoading = false;
 let dataLoaded = false;
 
 /* ---------------- Auth & data bootstrap ---------------- */
-function mapCompanyFromDb(r){ return {id:r.id, name:r.name, industry:r.industry||'', website:r.website||'', notes:r.notes||''}; }
-function mapContactFromDb(r){ return {id:r.id, name:r.name, email:r.email||'', phone:r.phone||'', title:r.title||'', companyId:r.company_id||'', notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
-function mapDealFromDb(r){ return {id:r.id, title:r.title, value:Number(r.value)||0, stage:r.stage, companyId:r.company_id||'', contactId:r.contact_id||'', closeDate: r.close_date ? new Date(r.close_date+'T00:00:00').getTime() : null, notes:r.notes||''}; }
-function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, done:!!r.done, contactId:r.contact_id||'', notes:r.notes||''}; }
-function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id, type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
+function mapCustomerFromDb(r){ return {id:r.id, name:r.name, industry:r.industry||'', website:r.website||'', notes:r.notes||''}; }
+function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||''}; }
+function mapContactFromDb(r){ return {id:r.id, name:r.name, email:r.email||'', phone:r.phone||'', title:r.title||'', customerId:r.customer_id||'', notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
+function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, done:!!r.done, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', notes:r.notes||''}; }
+function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
+function mapOpportunityFromDb(r){
+  return {
+    id:r.id, customerId:r.customer_id||'', projectName:r.project_name||'', opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
+    rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
+    oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
+    winLose:r.win_lose||'pending', loseReason:r.lose_reason||'',
+    ctrNumber:r.ctr_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
+    currency:r.currency||'', poValue:Number(r.po_value)||0, paymentTerms:r.payment_terms||'', poPrincipalId:r.po_principal_id||'',
+    lcStatus:r.lc_status||'pending', shipmentStatus:r.shipment_status||'pending', paymentStatus:r.payment_status||'pending',
+    notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()
+  };
+}
 
 function upsertLocal(collection, item){
   const arr = state[collection];
@@ -196,18 +218,27 @@ function removeLocal(collection, id){
 }
 
 async function loadAllData(){
-  const [co, ct, de, ta, ac] = await Promise.all([
-    sb.from('companies').select('*').order('name'),
+  const [cu, pr, ct, op, opr, ta, ac] = await Promise.all([
+    sb.from('customers').select('*').order('name'),
+    sb.from('principals').select('*').order('name'),
     sb.from('contacts').select('*').order('created_at', {ascending:false}),
-    sb.from('deals').select('*'),
+    sb.from('opportunities').select('*').order('created_at', {ascending:false}),
+    sb.from('opportunity_principals').select('*'),
     sb.from('tasks').select('*'),
     sb.from('activities').select('*'),
   ]);
-  state.companies = (co.data||[]).map(mapCompanyFromDb);
+  state.customers = (cu.data||[]).map(mapCustomerFromDb);
+  state.principals = (pr.data||[]).map(mapPrincipalFromDb);
   state.contacts = (ct.data||[]).map(mapContactFromDb);
-  state.deals = (de.data||[]).map(mapDealFromDb);
+  state.opportunities = (op.data||[]).map(mapOpportunityFromDb);
+  state.opportunityPrincipals = (opr.data||[]).map(r=>({opportunityId:r.opportunity_id, principalId:r.principal_id}));
   state.tasks = (ta.data||[]).map(mapTaskFromDb);
   state.activities = (ac.data||[]).map(mapActivityFromDb);
+}
+
+async function reloadOpportunityPrincipals(){
+  const {data} = await sb.from('opportunity_principals').select('*');
+  state.opportunityPrincipals = (data||[]).map(r=>({opportunityId:r.opportunity_id, principalId:r.principal_id}));
 }
 
 function applyRealtimeChange(collection, mapFn, payload){
@@ -218,9 +249,11 @@ function applyRealtimeChange(collection, mapFn, payload){
 
 function subscribeRealtime(){
   sb.channel('crm-changes')
-    .on('postgres_changes', {event:'*', schema:'public', table:'companies'}, p=>applyRealtimeChange('companies', mapCompanyFromDb, p))
+    .on('postgres_changes', {event:'*', schema:'public', table:'customers'}, p=>applyRealtimeChange('customers', mapCustomerFromDb, p))
+    .on('postgres_changes', {event:'*', schema:'public', table:'principals'}, p=>applyRealtimeChange('principals', mapPrincipalFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'contacts'}, p=>applyRealtimeChange('contacts', mapContactFromDb, p))
-    .on('postgres_changes', {event:'*', schema:'public', table:'deals'}, p=>applyRealtimeChange('deals', mapDealFromDb, p))
+    .on('postgres_changes', {event:'*', schema:'public', table:'opportunities'}, p=>applyRealtimeChange('opportunities', mapOpportunityFromDb, p))
+    .on('postgres_changes', {event:'*', schema:'public', table:'opportunity_principals'}, async ()=>{ await reloadOpportunityPrincipals(); render(); })
     .on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, p=>applyRealtimeChange('tasks', mapTaskFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, p=>applyRealtimeChange('activities', mapActivityFromDb, p))
     .subscribe();
@@ -242,16 +275,23 @@ sb.auth.onAuthStateChange((event, sess)=>{
   session = sess;
   authChecked = true;
   if(session && !dataLoaded){ bootstrap(); }
-  else if(!session){ dataLoaded=false; state={companies:[],contacts:[],deals:[],tasks:[],activities:[]}; render(); }
+  else if(!session){ dataLoaded=false; state={customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
 });
 
 /* ---------------- Helpers ---------------- */
-function fmtMoney(n){ return '$' + Number(n||0).toLocaleString(); }
+function fmtMoney(n, currency){ return (currency?currency+' ':'$') + Number(n||0).toLocaleString(); }
 function fmtDate(ts){ if(!ts) return '—'; return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
-function companyName(id){ const c = state.companies.find(x=>x.id===id); return c? c.name : '—'; }
+function customerName(id){ const c = state.customers.find(x=>x.id===id); return c? c.name : '—'; }
+function principalName(id){ const p = state.principals.find(x=>x.id===id); return p? p.name : '—'; }
 function contactName(id){ const c = state.contacts.find(x=>x.id===id); return c? c.name : '—'; }
-function stageInfo(id){ return STAGES.find(s=>s.id===id) || STAGES[0]; }
+function opportunityLabel(id){ const o = state.opportunities.find(x=>x.id===id); return o? (o.projectName || o.opportunityNumber || 'Opportunity') : '—'; }
+function typeLabel(id){ const t = OPPORTUNITY_TYPES.find(x=>x.id===id); return t? t.label : '—'; }
+function priorityLabel(id){ const p = PRIORITIES.find(x=>x.id===id); return p? p.label : '—'; }
+function winLoseInfo(id){ return WIN_LOSE.find(x=>x.id===id) || WIN_LOSE[0]; }
+function lcStatusInfo(id){ return LC_STATUSES.find(x=>x.id===id) || LC_STATUSES[1]; }
+function simpleStatusInfo(id){ return SIMPLE_STATUSES.find(x=>x.id===id) || SIMPLE_STATUSES[0]; }
+function opportunityPrincipalIds(oppId){ return state.opportunityPrincipals.filter(x=>x.opportunityId===oppId).map(x=>x.principalId); }
 function esc(s){ return (s===undefined||s===null) ? '' : String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -260,7 +300,6 @@ function toast(msg){
   clearTimeout(toast._t);
   toast._t = setTimeout(()=>t.classList.remove('show'), 2200);
 }
-function daysUntil(ts){ return Math.ceil((ts - Date.now())/86400000); }
 
 /* ---------------- Render root ---------------- */
 function render(){
@@ -321,9 +360,10 @@ function attachAuthHandlers(){
 function renderSidebar(){
   const items = [
     {id:'dashboard', icon:'📊', label:'Dashboard'},
+    {id:'opportunities', icon:'📋', label:'Opportunities'},
+    {id:'customers', icon:'🏢', label:'Customers'},
+    {id:'principals', icon:'🏭', label:'Principals'},
     {id:'contacts', icon:'👤', label:'Contacts'},
-    {id:'companies', icon:'🏢', label:'Companies'},
-    {id:'deals', icon:'💼', label:'Deals'},
     {id:'tasks', icon:'✅', label:'Tasks'},
   ];
   return `
@@ -343,9 +383,10 @@ function renderSidebar(){
 function renderView(){
   switch(view){
     case 'dashboard': return renderDashboard();
+    case 'opportunities': return renderOpportunities();
+    case 'customers': return renderCustomers();
+    case 'principals': return renderPrincipals();
     case 'contacts': return renderContacts();
-    case 'companies': return renderCompanies();
-    case 'deals': return renderDeals();
     case 'tasks': return renderTasks();
     default: return '';
   }
@@ -353,41 +394,47 @@ function renderView(){
 
 /* ---------------- Dashboard ---------------- */
 function renderDashboard(){
-  const openDeals = state.deals.filter(d=>d.stage!=='won' && d.stage!=='lost');
-  const wonDeals = state.deals.filter(d=>d.stage==='won');
-  const pipelineValue = openDeals.reduce((s,d)=>s+Number(d.value||0),0);
-  const wonValue = wonDeals.reduce((s,d)=>s+Number(d.value||0),0);
+  const open = state.opportunities.filter(o=>o.winLose==='pending');
+  const won = state.opportunities.filter(o=>o.winLose==='won');
+  const lost = state.opportunities.filter(o=>o.winLose==='lost');
+  const wonValue = won.reduce((s,o)=>s+Number(o.poValue||0),0);
   const openTasks = state.tasks.filter(t=>!t.done);
-  const overdueTasks = openTasks.filter(t=>t.dueDate < Date.now());
+  const overdueTasks = openTasks.filter(t=>t.dueDate && t.dueDate < Date.now());
 
-  const maxStageVal = Math.max(1, ...STAGES.map(s => state.deals.filter(d=>d.stage===s.id).reduce((sum,d)=>sum+Number(d.value||0),0)));
+  const actionNeeded = won.filter(o=>o.lcStatus==='pending' || o.shipmentStatus==='pending' || o.paymentStatus==='pending');
+
+  const maxCount = Math.max(1, open.length, won.length, lost.length);
+  const outcomeBars = WIN_LOSE.map(w=>{
+    const count = state.opportunities.filter(o=>o.winLose===w.id).length;
+    return {label:w.label, count, pct: Math.round((count/maxCount)*100), color: w.id==='won'?'#16a34a':(w.id==='lost'?'#dc2626':'#6b7280')};
+  });
 
   const recentActivities = [...state.activities].sort((a,b)=>b.timestamp-a.timestamp).slice(0,6);
-  const upcomingTasks = [...openTasks].sort((a,b)=>a.dueDate-b.dueDate).slice(0,6);
+  const upcomingTasks = [...openTasks].sort((a,b)=>(a.dueDate||0)-(b.dueDate||0)).slice(0,6);
 
   return `
   <div class="page-header">
     <div>
       <h1 class="page-title">Dashboard</h1>
-      <div class="page-subtitle">Overview of your pipeline and activity</div>
+      <div class="page-subtitle">Overview of your opportunities and activity</div>
     </div>
   </div>
 
   <div class="stat-grid">
     <div class="stat-card">
-      <div class="stat-label">Pipeline Value</div>
-      <div class="stat-value">${fmtMoney(pipelineValue)}</div>
-      <div class="stat-sub">${openDeals.length} open deal${openDeals.length!==1?'s':''}</div>
+      <div class="stat-label">Open Opportunities</div>
+      <div class="stat-value">${open.length}</div>
+      <div class="stat-sub">awaiting win/lose decision</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Won Revenue</div>
-      <div class="stat-value">${fmtMoney(wonValue)}</div>
-      <div class="stat-sub">${wonDeals.length} deal${wonDeals.length!==1?'s':''} closed won</div>
+      <div class="stat-label">Won</div>
+      <div class="stat-value">${won.length}</div>
+      <div class="stat-sub">total PO value ${fmtMoney(wonValue)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Contacts</div>
-      <div class="stat-value">${state.contacts.length}</div>
-      <div class="stat-sub">across ${state.companies.length} companies</div>
+      <div class="stat-label">Lost</div>
+      <div class="stat-value">${lost.length}</div>
+      <div class="stat-sub">${state.opportunities.length} total opportunities</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Open Tasks</div>
@@ -398,17 +445,21 @@ function renderDashboard(){
 
   <div class="dash-grid">
     <div class="panel">
-      <div class="panel-title">Pipeline by Stage</div>
-      ${STAGES.map(s=>{
-        const deals = state.deals.filter(d=>d.stage===s.id);
-        const val = deals.reduce((sum,d)=>sum+Number(d.value||0),0);
-        const pct = Math.round((val/maxStageVal)*100);
-        return `<div class="bar-row">
-          <div class="bar-label">${s.label}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${s.color}"></div></div>
-          <div class="bar-value">${fmtMoney(val)}</div>
-        </div>`;
-      }).join('')}
+      <div class="panel-title">Opportunities by Outcome</div>
+      ${outcomeBars.map(b=>`<div class="bar-row">
+          <div class="bar-label">${b.label}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${b.pct}%;background:${b.color}"></div></div>
+          <div class="bar-value">${b.count}</div>
+        </div>`).join('')}
+
+      <div class="panel-title" style="margin-top:22px;">Won — Action Needed</div>
+      ${actionNeeded.length ? actionNeeded.map(o=>`
+        <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
+          <div class="task-title">${esc(o.projectName || o.opportunityNumber || 'Opportunity')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
+          ${o.lcStatus==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
+          ${o.shipmentStatus==='pending' ? '<span class="badge badge-amber">Shipment pending</span>' : ''}
+          ${o.paymentStatus==='pending' ? '<span class="badge badge-amber">Payment pending</span>' : ''}
+        </div>`).join('') : `<div class="sub-text">Nothing pending — all won opportunities are clear 🎉</div>`}
     </div>
 
     <div class="panel">
@@ -416,22 +467,20 @@ function renderDashboard(){
       ${upcomingTasks.length ? upcomingTasks.map(t=>`
         <div class="task-row">
           <input type="checkbox" data-action="toggle-task" data-id="${t.id}" ${t.done?'checked':''}>
-          <div class="task-title">${esc(t.title)}<div class="sub-text">${contactName(t.contactId)}</div></div>
-          <span class="badge ${t.dueDate<Date.now() ? 'badge-red':'badge-gray'}">${fmtDate(t.dueDate)}</span>
+          <div class="task-title">${esc(t.title)}<div class="sub-text">${t.contactId?contactName(t.contactId):(t.opportunityId?opportunityLabel(t.opportunityId):'')}</div></div>
+          <span class="badge ${t.dueDate && t.dueDate<Date.now() ? 'badge-red':'badge-gray'}">${fmtDate(t.dueDate)}</span>
         </div>`).join('') : `<div class="sub-text">No upcoming tasks 🎉</div>`}
-    </div>
-  </div>
 
-  <div class="panel">
-    <div class="panel-title">Recent Activity</div>
-    ${recentActivities.length ? recentActivities.map(a=>`
-      <div class="activity-item">
-        <div class="activity-dot"></div>
-        <div>
-          <div><b>${contactName(a.contactId)}</b> — ${esc(a.note)}</div>
-          <div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div>
-        </div>
-      </div>`).join('') : `<div class="sub-text">No activity yet</div>`}
+      <div class="panel-title" style="margin-top:22px;">Recent Activity</div>
+      ${recentActivities.length ? recentActivities.map(a=>`
+        <div class="activity-item">
+          <div class="activity-dot"></div>
+          <div>
+            <div><b>${a.contactId?contactName(a.contactId):opportunityLabel(a.opportunityId)}</b> — ${esc(a.note)}</div>
+            <div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div>
+          </div>
+        </div>`).join('') : `<div class="sub-text">No activity yet</div>`}
+    </div>
   </div>
   `;
 }
@@ -439,11 +488,129 @@ function activityIcon(type){
   return {call:'📞',email:'✉️',meeting:'🗓️',note:'📝'}[type] || '•';
 }
 
+/* ---------------- Opportunities ---------------- */
+function renderOpportunities(){
+  const q = searchQuery.toLowerCase();
+  const rows = state.opportunities.filter(o =>
+    !q || (o.projectName||'').toLowerCase().includes(q) || (o.opportunityNumber||'').toLowerCase().includes(q) ||
+    (o.rfqNumber||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
+  ).sort((a,b)=>b.createdAt-a.createdAt);
+
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Opportunities</h1><div class="page-subtitle">${state.opportunities.length} total</div></div>
+    <button class="btn" data-action="new-opportunity">+ New Opportunity</button>
+  </div>
+  <div class="toolbar">
+    <div class="search-box"><input type="text" placeholder="Search opportunities..." value="${esc(searchQuery)}" data-action="search"></div>
+  </div>
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>Customer / Project</th><th>Type</th><th>RFQ #</th><th>Priority</th><th>Outcome</th>
+        <th>PO #</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Payment</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(o=>{
+          const wl = winLoseInfo(o.winLose);
+          const lc = lcStatusInfo(o.lcStatus);
+          const sh = simpleStatusInfo(o.shipmentStatus);
+          const pa = simpleStatusInfo(o.paymentStatus);
+          return `
+          <tr data-action="open-opportunity" data-id="${o.id}">
+            <td><div>${esc(o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
+            <td>${esc(typeLabel(o.opportunityType))}</td>
+            <td>${esc(o.rfqNumber||'—')}</td>
+            <td>${esc(priorityLabel(o.priority))}</td>
+            <td><span class="badge ${wl.badge}">${wl.label}</span></td>
+            <td>${esc(o.poNumber||'—')}</td>
+            <td>${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
+            <td><span class="badge ${lc.badge}">${lc.label}</span></td>
+            <td><span class="badge ${sh.badge}">${sh.label}</span></td>
+            <td><span class="badge ${pa.badge}">${pa.label}</span></td>
+            <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-opportunity" data-id="${o.id}">🗑️</button></td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="11">No opportunities found. <span class="link" data-action="new-opportunity">Add one</span></td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+/* ---------------- Customers ---------------- */
+function renderCustomers(){
+  const q = searchQuery.toLowerCase();
+  const rows = state.customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.industry||'').toLowerCase().includes(q));
+
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Customers</h1><div class="page-subtitle">${state.customers.length} total</div></div>
+    <button class="btn" data-action="new-customer">+ New Customer</button>
+  </div>
+  <div class="toolbar">
+    <div class="search-box"><input type="text" placeholder="Search customers..." value="${esc(searchQuery)}" data-action="search"></div>
+  </div>
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Customer</th><th>Industry</th><th>Website</th><th>Contacts</th><th>Open Opportunities</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(c=>{
+          const contactCount = state.contacts.filter(p=>p.customerId===c.id).length;
+          const oppCount = state.opportunities.filter(o=>o.customerId===c.id && o.winLose==='pending').length;
+          return `
+          <tr data-action="open-customer" data-id="${c.id}">
+            <td><div class="name-cell"><div class="avatar">${initials(c.name)}</div><div>${esc(c.name)}</div></div></td>
+            <td>${esc(c.industry||'—')}</td>
+            <td>${esc(c.website||'—')}</td>
+            <td>${contactCount}</td>
+            <td>${oppCount}</td>
+            <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-customer" data-id="${c.id}">🗑️</button></td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="6">No customers found. <span class="link" data-action="new-customer">Add one</span></td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+/* ---------------- Principals ---------------- */
+function renderPrincipals(){
+  const q = searchQuery.toLowerCase();
+  const rows = state.principals.filter(p => !q || p.name.toLowerCase().includes(q));
+
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Principals</h1><div class="page-subtitle">${state.principals.length} total · the OEM manufacturers you represent</div></div>
+    <button class="btn" data-action="new-principal">+ New Principal</button>
+  </div>
+  <div class="toolbar">
+    <div class="search-box"><input type="text" placeholder="Search principals..." value="${esc(searchQuery)}" data-action="search"></div>
+  </div>
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Principal</th><th>Notes</th><th>Linked Opportunities</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(p=>{
+          const oppCount = state.opportunityPrincipals.filter(x=>x.principalId===p.id).length;
+          return `
+          <tr data-action="open-principal" data-id="${p.id}">
+            <td><div class="name-cell"><div class="avatar">${initials(p.name)}</div><div>${esc(p.name)}</div></div></td>
+            <td class="sub-text">${esc(p.notes||'—')}</td>
+            <td>${oppCount}</td>
+            <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-principal" data-id="${p.id}">🗑️</button></td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="4">No principals found. <span class="link" data-action="new-principal">Add one</span></td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
 /* ---------------- Contacts ---------------- */
 function renderContacts(){
   const q = searchQuery.toLowerCase();
   const rows = state.contacts.filter(c =>
-    !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || companyName(c.companyId).toLowerCase().includes(q)
+    !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)
   ).sort((a,b)=>b.createdAt-a.createdAt);
 
   return `
@@ -456,12 +623,12 @@ function renderContacts(){
   </div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Customer</th><th>Email</th><th>Phone</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(c=>`
           <tr data-action="open-contact" data-id="${c.id}">
             <td><div class="name-cell"><div class="avatar">${initials(c.name)}</div><div><div>${esc(c.name)}</div><div class="sub-text">${esc(c.title||'')}</div></div></div></td>
-            <td>${esc(companyName(c.companyId))}</td>
+            <td>${esc(customerName(c.customerId))}</td>
             <td>${esc(c.email||'—')}</td>
             <td>${esc(c.phone||'—')}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-contact" data-id="${c.id}">🗑️</button></td>
@@ -472,78 +639,11 @@ function renderContacts(){
   `;
 }
 
-/* ---------------- Companies ---------------- */
-function renderCompanies(){
-  const q = searchQuery.toLowerCase();
-  const rows = state.companies.filter(c => !q || c.name.toLowerCase().includes(q) || (c.industry||'').toLowerCase().includes(q));
-
-  return `
-  <div class="page-header">
-    <div><h1 class="page-title">Companies</h1><div class="page-subtitle">${state.companies.length} total</div></div>
-    <button class="btn" data-action="new-company">+ New Company</button>
-  </div>
-  <div class="toolbar">
-    <div class="search-box"><input type="text" placeholder="Search companies..." value="${esc(searchQuery)}" data-action="search"></div>
-  </div>
-  <div class="panel" style="padding:0;overflow-x:auto;">
-    <table>
-      <thead><tr><th>Company</th><th>Industry</th><th>Website</th><th>Contacts</th><th>Open Deals</th><th></th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map(c=>{
-          const contactCount = state.contacts.filter(p=>p.companyId===c.id).length;
-          const dealCount = state.deals.filter(d=>d.companyId===c.id && d.stage!=='won' && d.stage!=='lost').length;
-          return `
-          <tr data-action="open-company" data-id="${c.id}">
-            <td><div class="name-cell"><div class="avatar">${initials(c.name)}</div><div>${esc(c.name)}</div></div></td>
-            <td>${esc(c.industry||'—')}</td>
-            <td>${esc(c.website||'—')}</td>
-            <td>${contactCount}</td>
-            <td>${dealCount}</td>
-            <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-company" data-id="${c.id}">🗑️</button></td>
-          </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">No companies found. <span class="link" data-action="new-company">Add one</span></td></tr>`}
-      </tbody>
-    </table>
-  </div>
-  `;
-}
-
-/* ---------------- Deals (Kanban) ---------------- */
-function renderDeals(){
-  return `
-  <div class="page-header">
-    <div><h1 class="page-title">Deals</h1><div class="page-subtitle">${state.deals.length} total · drag cards to change stage</div></div>
-    <button class="btn" data-action="new-deal">+ New Deal</button>
-  </div>
-  <div class="kanban">
-    ${STAGES.map(s=>{
-      const deals = state.deals.filter(d=>d.stage===s.id);
-      const total = deals.reduce((sum,d)=>sum+Number(d.value||0),0);
-      return `
-      <div class="kanban-col">
-        <div class="kanban-col-header" style="border-color:${s.color}">
-          <span>${s.label} <span class="sub-text">(${deals.length})</span></span>
-          <span style="color:${s.color}">${fmtMoney(total)}</span>
-        </div>
-        <div class="kanban-col-body" data-stage="${s.id}">
-          ${deals.map(d=>`
-            <div class="deal-card" draggable="true" data-id="${d.id}" data-action="open-deal">
-              <div class="deal-title">${esc(d.title)}</div>
-              <div class="deal-value">${fmtMoney(d.value)}</div>
-              <div class="deal-meta"><span>${esc(companyName(d.companyId))}</span><span>${fmtDate(d.closeDate)}</span></div>
-            </div>`).join('')}
-        </div>
-      </div>`;
-    }).join('')}
-  </div>
-  `;
-}
-
 /* ---------------- Tasks ---------------- */
 function renderTasks(){
   const sorted = [...state.tasks].sort((a,b)=>{
     if(a.done !== b.done) return a.done ? 1 : -1;
-    return a.dueDate - b.dueDate;
+    return (a.dueDate||0) - (b.dueDate||0);
   });
   return `
   <div class="page-header">
@@ -556,9 +656,9 @@ function renderTasks(){
         <input type="checkbox" data-action="toggle-task" data-id="${t.id}" ${t.done?'checked':''}>
         <div class="task-title" data-action="open-task" data-id="${t.id}" style="cursor:pointer">
           ${esc(t.title)}
-          <div class="sub-text">${contactName(t.contactId)}</div>
+          <div class="sub-text">${t.contactId?contactName(t.contactId):''}${t.contactId&&t.opportunityId?' · ':''}${t.opportunityId?opportunityLabel(t.opportunityId):''}</div>
         </div>
-        <span class="badge ${!t.done && t.dueDate<Date.now() ? 'badge-red':'badge-gray'}">${fmtDate(t.dueDate)}</span>
+        <span class="badge ${!t.done && t.dueDate && t.dueDate<Date.now() ? 'badge-red':'badge-gray'}">${fmtDate(t.dueDate)}</span>
         <button class="icon-btn" data-action="delete-task" data-id="${t.id}">🗑️</button>
       </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">✅</div>No tasks yet</div>`}
   </div>
@@ -566,32 +666,36 @@ function renderTasks(){
 }
 
 /* ---------------- Modals ---------------- */
+function customerOptions(selectedId){
+  return `<option value="">—</option>` + state.customers.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
+}
+function principalOptions(selectedId){
+  return `<option value="">—</option>` + state.principals.map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${esc(p.name)}</option>`).join('');
+}
 function contactOptions(selectedId){
-  return state.contacts.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
+  return `<option value="">—</option>` + state.contacts.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
 }
-function companyOptions(selectedId){
-  return `<option value="">—</option>` + state.companies.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
+function opportunityOptions(selectedId){
+  return `<option value="">—</option>` + state.opportunities.map(o=>`<option value="${o.id}" ${o.id===selectedId?'selected':''}>${esc(o.projectName||o.opportunityNumber||'Untitled')}</option>`).join('');
 }
-function stageOptions(selectedId){
-  return STAGES.map(s=>`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${s.label}</option>`).join('');
+function optionList(list, selectedId){
+  return `<option value="">—</option>` + list.map(x=>`<option value="${x.id}" ${x.id===selectedId?'selected':''}>${esc(x.label)}</option>`).join('');
 }
 
 function renderModal(){
   const {type} = modal;
+  if(type==='customer-form') return renderCustomerForm();
+  if(type==='principal-form') return renderPrincipalForm();
   if(type==='contact-form') return renderContactForm();
-  if(type==='company-form') return renderCompanyForm();
-  if(type==='deal-form') return renderDealForm();
+  if(type==='opportunity-form') return renderOpportunityForm();
   if(type==='task-form') return renderTaskForm();
-  if(type==='contact-detail') return renderContactDetail();
-  if(type==='company-detail') return renderCompanyDetail();
-  if(type==='deal-detail') return renderDealDetail();
   return '';
 }
 
-function modalShell(title, bodyHtml, footerHtml){
+function modalShell(title, bodyHtml, footerHtml, wide){
   return `
   <div class="modal-backdrop" data-action="close-modal">
-    <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal" style="${wide?'max-width:680px;':''}" onclick="event.stopPropagation()">
       <div class="modal-header"><h3>${title}</h3><button class="close-x" data-action="close-modal">✕</button></div>
       <div class="modal-body">${bodyHtml}</div>
       ${footerHtml ? `<div class="modal-footer">${footerHtml}</div>` : ''}
@@ -599,9 +703,55 @@ function modalShell(title, bodyHtml, footerHtml){
   </div>`;
 }
 
+function renderCustomerForm(){
+  const editing = modal.id ? state.customers.find(c=>c.id===modal.id) : null;
+  const c = editing || {name:'',industry:'',website:'',notes:''};
+  const relatedContacts = editing ? state.contacts.filter(p=>p.customerId===editing.id) : [];
+  const relatedOpps = editing ? state.opportunities.filter(o=>o.customerId===editing.id) : [];
+  return modalShell(editing?'Edit Customer':'New Customer', `
+    <form id="customer-form">
+      <div class="field"><label>Customer Name *</label><input name="name" required value="${esc(c.name)}"></div>
+      <div class="field-row">
+        <div class="field"><label>Industry</label><input name="industry" value="${esc(c.industry)}"></div>
+        <div class="field"><label>Website</label><input name="website" value="${esc(c.website)}"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(c.notes)}</textarea></div>
+    </form>
+    ${editing && (relatedContacts.length || relatedOpps.length) ? `
+      ${relatedContacts.length ? `<div class="detail-section"><div class="detail-label">Contacts</div>${relatedContacts.map(p=>`<div class="sub-text" style="margin-bottom:4px">${esc(p.name)} — ${esc(p.title||'')}</div>`).join('')}</div>` : ''}
+      ${relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} <span class="badge ${winLoseInfo(o.winLose).badge}">${winLoseInfo(o.winLose).label}</span></div>`).join('')}</div>` : ''}
+    ` : ''}
+  `, `
+    <div>${editing?`<button class="btn btn-danger" data-action="delete-customer" data-id="${editing.id}">Delete</button>`:''}</div>
+    <div class="modal-footer-right">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn" data-action="save-customer" data-id="${editing?editing.id:''}">Save</button>
+    </div>
+  `);
+}
+
+function renderPrincipalForm(){
+  const editing = modal.id ? state.principals.find(p=>p.id===modal.id) : null;
+  const p = editing || {name:'',notes:''};
+  const relatedOpps = editing ? state.opportunities.filter(o=>opportunityPrincipalIds(o.id).includes(editing.id)) : [];
+  return modalShell(editing?'Edit Principal':'New Principal', `
+    <form id="principal-form">
+      <div class="field"><label>Principal Name *</label><input name="name" required value="${esc(p.name)}"></div>
+      <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(p.notes)}</textarea></div>
+    </form>
+    ${editing && relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Linked Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} — ${esc(customerName(o.customerId))}</div>`).join('')}</div>` : ''}
+  `, `
+    <div>${editing?`<button class="btn btn-danger" data-action="delete-principal" data-id="${editing.id}">Delete</button>`:''}</div>
+    <div class="modal-footer-right">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn" data-action="save-principal" data-id="${editing?editing.id:''}">Save</button>
+    </div>
+  `);
+}
+
 function renderContactForm(){
   const editing = modal.id ? state.contacts.find(c=>c.id===modal.id) : null;
-  const c = editing || {name:'',email:'',phone:'',title:'',companyId:'',notes:''};
+  const c = editing || {name:'',email:'',phone:'',title:'',customerId:'',notes:''};
   return modalShell(editing?'Edit Contact':'New Contact', `
     <form id="contact-form">
       <div class="field"><label>Full Name *</label><input name="name" required value="${esc(c.name)}"></div>
@@ -611,7 +761,7 @@ function renderContactForm(){
       </div>
       <div class="field-row">
         <div class="field"><label>Title</label><input name="title" value="${esc(c.title)}"></div>
-        <div class="field"><label>Company</label><select name="companyId">${companyOptions(c.companyId)}</select></div>
+        <div class="field"><label>Customer</label><select name="customerId">${customerOptions(c.customerId)}</select></div>
       </div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(c.notes)}</textarea></div>
     </form>
@@ -624,65 +774,18 @@ function renderContactForm(){
   `);
 }
 
-function renderCompanyForm(){
-  const editing = modal.id ? state.companies.find(c=>c.id===modal.id) : null;
-  const c = editing || {name:'',industry:'',website:'',notes:''};
-  return modalShell(editing?'Edit Company':'New Company', `
-    <form id="company-form">
-      <div class="field"><label>Company Name *</label><input name="name" required value="${esc(c.name)}"></div>
-      <div class="field-row">
-        <div class="field"><label>Industry</label><input name="industry" value="${esc(c.industry)}"></div>
-        <div class="field"><label>Website</label><input name="website" value="${esc(c.website)}"></div>
-      </div>
-      <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(c.notes)}</textarea></div>
-    </form>
-  `, `
-    <div>${editing?`<button class="btn btn-danger" data-action="delete-company" data-id="${editing.id}">Delete</button>`:''}</div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-company" data-id="${editing?editing.id:''}">Save</button>
-    </div>
-  `);
-}
-
-function renderDealForm(){
-  const editing = modal.id ? state.deals.find(d=>d.id===modal.id) : null;
-  const d = editing || {title:'',value:'',stage:'lead',contactId:'',companyId:'',closeDate:'',notes:''};
-  const closeDateVal = d.closeDate ? new Date(d.closeDate).toISOString().slice(0,10) : '';
-  return modalShell(editing?'Edit Deal':'New Deal', `
-    <form id="deal-form">
-      <div class="field"><label>Deal Title *</label><input name="title" required value="${esc(d.title)}"></div>
-      <div class="field-row">
-        <div class="field"><label>Value ($)</label><input name="value" type="number" min="0" value="${esc(d.value)}"></div>
-        <div class="field"><label>Stage</label><select name="stage">${stageOptions(d.stage)}</select></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Company</label><select name="companyId">${companyOptions(d.companyId)}</select></div>
-        <div class="field"><label>Contact</label><select name="contactId"><option value="">—</option>${contactOptions(d.contactId)}</select></div>
-      </div>
-      <div class="field"><label>Expected Close Date</label><input name="closeDate" type="date" value="${closeDateVal}"></div>
-      <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(d.notes)}</textarea></div>
-    </form>
-  `, `
-    <div>${editing?`<button class="btn btn-danger" data-action="delete-deal" data-id="${editing.id}">Delete</button>`:''}</div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
-      <button class="btn" data-action="save-deal" data-id="${editing?editing.id:''}">Save</button>
-    </div>
-  `);
-}
-
 function renderTaskForm(){
   const editing = modal.id ? state.tasks.find(t=>t.id===modal.id) : null;
-  const t = editing || {title:'',dueDate:'',contactId:'',notes:''};
+  const t = editing || {title:'',dueDate:'',contactId:'',opportunityId:'',notes:''};
   const dueDateVal = t.dueDate ? new Date(t.dueDate).toISOString().slice(0,10) : '';
   return modalShell(editing?'Edit Task':'New Task', `
     <form id="task-form">
       <div class="field"><label>Task *</label><input name="title" required value="${esc(t.title)}"></div>
       <div class="field-row">
         <div class="field"><label>Due Date</label><input name="dueDate" type="date" value="${dueDateVal}"></div>
-        <div class="field"><label>Related Contact</label><select name="contactId"><option value="">—</option>${contactOptions(t.contactId)}</select></div>
+        <div class="field"><label>Related Contact</label><select name="contactId">${contactOptions(t.contactId)}</select></div>
       </div>
+      <div class="field"><label>Related Opportunity</label><select name="opportunityId">${opportunityOptions(t.opportunityId)}</select></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(t.notes)}</textarea></div>
     </form>
   `, `
@@ -694,97 +797,95 @@ function renderTaskForm(){
   `);
 }
 
-function renderContactDetail(){
-  const c = state.contacts.find(x=>x.id===modal.id);
-  if(!c) return '';
-  const acts = state.activities.filter(a=>a.contactId===c.id).sort((a,b)=>b.timestamp-a.timestamp);
-  const relatedDeals = state.deals.filter(d=>d.contactId===c.id);
-  const relatedTasks = state.tasks.filter(t=>t.contactId===c.id);
-  return modalShell(esc(c.name), `
-    <div class="detail-section">
-      <div class="sub-text">${esc(c.title||'')} ${c.title&&c.companyId?'at':''} <span class="link" data-action="open-company" data-id="${c.companyId}">${esc(companyName(c.companyId))}</span></div>
-      <div style="margin-top:10px">✉️ ${esc(c.email||'—')} &nbsp;&nbsp; 📞 ${esc(c.phone||'—')}</div>
-      ${c.notes ? `<div style="margin-top:10px" class="sub-text">${esc(c.notes)}</div>` : ''}
-    </div>
-    ${relatedDeals.length ? `<div class="detail-section"><div class="detail-label">Deals</div>
-      ${relatedDeals.map(d=>`<div class="sub-text" style="margin-bottom:4px">• ${esc(d.title)} — ${fmtMoney(d.value)} <span class="badge badge-gray">${stageInfo(d.stage).label}</span></div>`).join('')}
-    </div>` : ''}
-    ${relatedTasks.length ? `<div class="detail-section"><div class="detail-label">Tasks</div>
-      ${relatedTasks.map(t=>`<div class="sub-text" style="margin-bottom:4px">${t.done?'✅':'⬜'} ${esc(t.title)}</div>`).join('')}
-    </div>` : ''}
-    <div class="detail-section">
-      <div class="detail-label">Log an Activity</div>
-      <form id="activity-form" style="display:flex;gap:8px;">
-        <select name="type" style="max-width:110px">
-          <option value="call">📞 Call</option>
-          <option value="email">✉️ Email</option>
-          <option value="meeting">🗓️ Meeting</option>
-          <option value="note">📝 Note</option>
-        </select>
-        <input name="note" placeholder="What happened?" required>
-        <button class="btn btn-sm" data-action="add-activity" data-id="${c.id}" type="submit">Add</button>
-      </form>
-    </div>
-    <div class="detail-section">
+function renderOpportunityForm(){
+  const editing = modal.id ? state.opportunities.find(o=>o.id===modal.id) : null;
+  const o = editing || {customerId:'',projectName:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',winLose:'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',paymentStatus:'pending',notes:''};
+  const rfqDateVal = o.rfqDate ? new Date(o.rfqDate).toISOString().slice(0,10) : '';
+  const poDateVal = o.poDate ? new Date(o.poDate).toISOString().slice(0,10) : '';
+  const selectedPrincipals = editing ? opportunityPrincipalIds(editing.id) : [];
+  const acts = editing ? state.activities.filter(a=>a.opportunityId===editing.id).sort((a,b)=>b.timestamp-a.timestamp) : [];
+
+  return modalShell(editing?'Edit Opportunity':'New Opportunity', `
+    <form id="opportunity-form">
+      <div class="form-section-title">Opportunity Details</div>
+      <div class="field"><label>Customer</label><select name="customerId">${customerOptions(o.customerId)}</select></div>
+      <div class="field"><label>Project Name / Description</label><input name="projectName" value="${esc(o.projectName)}"></div>
+      <div class="field-row">
+        <div class="field"><label>Opportunity Type</label><select name="opportunityType"><option value="">—</option>${OPPORTUNITY_TYPES.map(t=>`<option value="${t.id}" ${t.id===o.opportunityType?'selected':''}>${t.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Opportunity Number</label><input name="opportunityNumber" value="${esc(o.opportunityNumber)}"></div>
+      </div>
+      <div class="field"><label>Principals (OEMs involved — select multiple)</label>
+        <select name="principalIds" multiple size="4">${state.principals.map(p=>`<option value="${p.id}" ${selectedPrincipals.includes(p.id)?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+      </div>
+
+      <div class="form-section-title">RFQ</div>
+      <div class="field-row">
+        <div class="field"><label>RFQ #</label><input name="rfqNumber" value="${esc(o.rfqNumber)}"></div>
+        <div class="field"><label>OEM Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
+      </div>
+      <div class="field">
+        <label>RFQ Date</label><input name="rfqDate" type="date" value="${rfqDateVal}">
+        <div class="checkbox-row"><input type="checkbox" name="rfqDateEstimated" id="rfqDateEstimated" ${o.rfqDateEstimated?'checked':''}><label for="rfqDateEstimated" style="margin:0;">Estimated / expected date, not confirmed</label></div>
+      </div>
+      <div class="field"><label>Priority</label><select name="priority"><option value="">—</option>${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===o.priority?'selected':''}>${p.label}</option>`).join('')}</select></div>
+
+      <div class="form-section-title">Win / Lose</div>
+      <div class="field"><label>Outcome</label><select name="winLose">${WIN_LOSE.map(w=>`<option value="${w.id}" ${w.id===o.winLose?'selected':''}>${w.label}</option>`).join('')}</select></div>
+      <div class="field"><label>Lose Reason (if lost)</label><input name="loseReason" value="${esc(o.loseReason)}"></div>
+
+      <div class="form-section-title">Purchase Order</div>
+      <div class="field-row">
+        <div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div>
+        <div class="field"><label>PO #</label><input name="poNumber" value="${esc(o.poNumber)}"></div>
+      </div>
+      <div class="field">
+        <label>PO Date</label><input name="poDate" type="date" value="${poDateVal}">
+        <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date, not confirmed</label></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Currency</label><input name="currency" placeholder="USD" value="${esc(o.currency)}"></div>
+        <div class="field"><label>PO Value</label><input name="poValue" type="number" min="0" step="0.01" value="${esc(o.poValue)}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Payment Terms</label><select name="paymentTerms"><option value="">—</option>${PAYMENT_TERMS.map(t=>`<option value="${t}" ${t===o.paymentTerms?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>PO Principal</label><select name="poPrincipalId">${principalOptions(o.poPrincipalId)}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.lcStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Shipment Status</label><select name="shipmentStatus">${SIMPLE_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.shipmentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+      </div>
+      <div class="field"><label>Payment Status</label><select name="paymentStatus">${SIMPLE_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.paymentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+
+      <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(o.notes)}</textarea></div>
+    </form>
+
+    ${editing ? `
+    <div class="form-section-title">Log an Activity</div>
+    <form id="activity-form" style="display:flex;gap:8px;">
+      <select name="type" style="max-width:110px">
+        <option value="call">📞 Call</option>
+        <option value="email">✉️ Email</option>
+        <option value="meeting">🗓️ Meeting</option>
+        <option value="note">📝 Note</option>
+      </select>
+      <input name="note" placeholder="What happened?" required>
+      <button class="btn btn-sm" data-action="add-opportunity-activity" data-id="${editing.id}" type="submit">Add</button>
+    </form>
+    <div class="detail-section" style="margin-top:14px;">
       <div class="detail-label">Activity Timeline</div>
       ${acts.length ? acts.map(a=>`
         <div class="activity-item"><div class="activity-dot"></div>
           <div><div>${esc(a.note)}</div><div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div></div>
         </div>`).join('') : `<div class="sub-text">No activity logged yet.</div>`}
     </div>
+    ` : ''}
   `, `
-    <div><button class="btn btn-danger" data-action="delete-contact" data-id="${c.id}">Delete</button></div>
+    <div>${editing?`<button class="btn btn-danger" data-action="delete-opportunity" data-id="${editing.id}">Delete</button>`:''}</div>
     <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Close</button>
-      <button class="btn" data-action="edit-contact" data-id="${c.id}">Edit</button>
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn" data-action="save-opportunity" data-id="${editing?editing.id:''}">Save</button>
     </div>
-  `);
-}
-
-function renderCompanyDetail(){
-  const c = state.companies.find(x=>x.id===modal.id);
-  if(!c) return '';
-  const relatedContacts = state.contacts.filter(p=>p.companyId===c.id);
-  const relatedDeals = state.deals.filter(d=>d.companyId===c.id);
-  return modalShell(esc(c.name), `
-    <div class="detail-section">
-      <div class="sub-text">${esc(c.industry||'')} ${c.website?'· '+esc(c.website):''}</div>
-      ${c.notes ? `<div style="margin-top:10px" class="sub-text">${esc(c.notes)}</div>` : ''}
-    </div>
-    <div class="detail-section"><div class="detail-label">Contacts</div>
-      ${relatedContacts.length ? relatedContacts.map(p=>`<div class="sub-text" style="margin-bottom:4px"><span class="link" data-action="open-contact" data-id="${p.id}">${esc(p.name)}</span> — ${esc(p.title||'')}</div>`).join('') : `<div class="sub-text">No contacts yet.</div>`}
-    </div>
-    <div class="detail-section"><div class="detail-label">Deals</div>
-      ${relatedDeals.length ? relatedDeals.map(d=>`<div class="sub-text" style="margin-bottom:4px">• ${esc(d.title)} — ${fmtMoney(d.value)} <span class="badge badge-gray">${stageInfo(d.stage).label}</span></div>`).join('') : `<div class="sub-text">No deals yet.</div>`}
-    </div>
-  `, `
-    <div><button class="btn btn-danger" data-action="delete-company" data-id="${c.id}">Delete</button></div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Close</button>
-      <button class="btn" data-action="edit-company" data-id="${c.id}">Edit</button>
-    </div>
-  `);
-}
-
-function renderDealDetail(){
-  const d = state.deals.find(x=>x.id===modal.id);
-  if(!d) return '';
-  return modalShell(esc(d.title), `
-    <div class="detail-section">
-      <div class="stat-value" style="font-size:22px">${fmtMoney(d.value)}</div>
-      <div class="sub-text" style="margin-top:8px">Stage: <span class="badge badge-blue">${stageInfo(d.stage).label}</span></div>
-      <div class="sub-text" style="margin-top:6px">Company: <span class="link" data-action="open-company" data-id="${d.companyId}">${esc(companyName(d.companyId))}</span></div>
-      <div class="sub-text" style="margin-top:6px">Contact: <span class="link" data-action="open-contact" data-id="${d.contactId}">${esc(contactName(d.contactId))}</span></div>
-      <div class="sub-text" style="margin-top:6px">Expected Close: ${fmtDate(d.closeDate)}</div>
-      ${d.notes ? `<div style="margin-top:10px" class="sub-text">${esc(d.notes)}</div>` : ''}
-    </div>
-  `, `
-    <div><button class="btn btn-danger" data-action="delete-deal" data-id="${d.id}">Delete</button></div>
-    <div class="modal-footer-right">
-      <button class="btn btn-secondary" data-action="close-modal">Close</button>
-      <button class="btn" data-action="edit-deal" data-id="${d.id}">Edit</button>
-    </div>
-  `);
+  `, true);
 }
 
 /* ---------------- Event handling ---------------- */
@@ -803,23 +904,34 @@ function attachGlobalHandlers(){
     await sb.auth.signOut();
   });
 
-  // New / open buttons
+  bind('new-customer', ()=>{ modal={type:'customer-form', id:null}; render(); });
+  bind('new-principal', ()=>{ modal={type:'principal-form', id:null}; render(); });
   bind('new-contact', ()=>{ modal={type:'contact-form', id:null}; render(); });
-  bind('new-company', ()=>{ modal={type:'company-form', id:null}; render(); });
-  bind('new-deal', ()=>{ modal={type:'deal-form', id:null}; render(); });
+  bind('new-opportunity', ()=>{ modal={type:'opportunity-form', id:null}; render(); });
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
 
-  bind('open-contact', (el)=>{ modal={type:'contact-detail', id:el.dataset.id}; render(); });
-  bind('open-company', (el)=>{ modal={type:'company-detail', id:el.dataset.id}; render(); });
-  bind('open-deal', (el)=>{ modal={type:'deal-detail', id:el.dataset.id}; render(); });
+  bind('open-customer', (el)=>{ modal={type:'customer-form', id:el.dataset.id}; render(); });
+  bind('open-principal', (el)=>{ modal={type:'principal-form', id:el.dataset.id}; render(); });
+  bind('open-contact', (el)=>{ modal={type:'contact-form', id:el.dataset.id}; render(); });
+  bind('open-opportunity', (el)=>{ modal={type:'opportunity-form', id:el.dataset.id}; render(); });
   bind('open-task', (el)=>{ modal={type:'task-form', id:el.dataset.id}; render(); });
-
-  bind('edit-contact', (el)=>{ modal={type:'contact-form', id:el.dataset.id}; render(); });
-  bind('edit-company', (el)=>{ modal={type:'company-form', id:el.dataset.id}; render(); });
-  bind('edit-deal', (el)=>{ modal={type:'deal-form', id:el.dataset.id}; render(); });
 
   bind('close-modal', ()=>{ modal=null; render(); });
 
+  bind('delete-customer', async (el)=>{
+    if(!confirm('Delete this customer? Related contacts and opportunities will be unlinked.')) return;
+    const id = el.dataset.id;
+    const {error} = await sb.from('customers').delete().eq('id', id);
+    if(error){ toast('Error: '+error.message); return; }
+    removeLocal('customers', id); modal=null; render(); toast('Customer deleted');
+  });
+  bind('delete-principal', async (el)=>{
+    if(!confirm('Delete this principal?')) return;
+    const id = el.dataset.id;
+    const {error} = await sb.from('principals').delete().eq('id', id);
+    if(error){ toast('Error: '+error.message); return; }
+    removeLocal('principals', id); modal=null; render(); toast('Principal deleted');
+  });
   bind('delete-contact', async (el)=>{
     if(!confirm('Delete this contact?')) return;
     const id = el.dataset.id;
@@ -827,19 +939,12 @@ function attachGlobalHandlers(){
     if(error){ toast('Error: '+error.message); return; }
     removeLocal('contacts', id); modal=null; render(); toast('Contact deleted');
   });
-  bind('delete-company', async (el)=>{
-    if(!confirm('Delete this company? Related contacts and deals will be unlinked.')) return;
+  bind('delete-opportunity', async (el)=>{
+    if(!confirm('Delete this opportunity?')) return;
     const id = el.dataset.id;
-    const {error} = await sb.from('companies').delete().eq('id', id);
+    const {error} = await sb.from('opportunities').delete().eq('id', id);
     if(error){ toast('Error: '+error.message); return; }
-    removeLocal('companies', id); modal=null; render(); toast('Company deleted');
-  });
-  bind('delete-deal', async (el)=>{
-    if(!confirm('Delete this deal?')) return;
-    const id = el.dataset.id;
-    const {error} = await sb.from('deals').delete().eq('id', id);
-    if(error){ toast('Error: '+error.message); return; }
-    removeLocal('deals', id); modal=null; render(); toast('Deal deleted');
+    removeLocal('opportunities', id); modal=null; render(); toast('Opportunity deleted');
   });
   bind('delete-task', async (el)=>{
     const id = el.dataset.id;
@@ -856,48 +961,43 @@ function attachGlobalHandlers(){
     upsertLocal('tasks', mapTaskFromDb(data)); render();
   }, 'change');
 
+  bind('save-customer', async (el)=>{
+    const form = document.getElementById('customer-form');
+    if(!form.reportValidity()) return;
+    const fd = new FormData(form);
+    const id = el.dataset.id;
+    const payload = {name:fd.get('name').trim(), industry:fd.get('industry').trim()||null, website:fd.get('website').trim()||null, notes:fd.get('notes').trim()||null};
+    const q = id ? sb.from('customers').update(payload).eq('id', id) : sb.from('customers').insert(payload);
+    const {data, error} = await q.select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('customers', mapCustomerFromDb(data));
+    modal=null; render(); toast('Customer saved');
+  });
+
+  bind('save-principal', async (el)=>{
+    const form = document.getElementById('principal-form');
+    if(!form.reportValidity()) return;
+    const fd = new FormData(form);
+    const id = el.dataset.id;
+    const payload = {name:fd.get('name').trim(), notes:fd.get('notes').trim()||null};
+    const q = id ? sb.from('principals').update(payload).eq('id', id) : sb.from('principals').insert(payload);
+    const {data, error} = await q.select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('principals', mapPrincipalFromDb(data));
+    modal=null; render(); toast('Principal saved');
+  });
+
   bind('save-contact', async (el)=>{
     const form = document.getElementById('contact-form');
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
-    const payload = {name:fd.get('name').trim(), email:fd.get('email').trim()||null, phone:fd.get('phone').trim()||null, title:fd.get('title').trim()||null, company_id:fd.get('companyId')||null, notes:fd.get('notes').trim()||null};
+    const payload = {name:fd.get('name').trim(), email:fd.get('email').trim()||null, phone:fd.get('phone').trim()||null, title:fd.get('title').trim()||null, customer_id:fd.get('customerId')||null, notes:fd.get('notes').trim()||null};
     const q = id ? sb.from('contacts').update(payload).eq('id', id) : sb.from('contacts').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('contacts', mapContactFromDb(data));
     modal=null; render(); toast('Contact saved');
-  });
-
-  bind('save-company', async (el)=>{
-    const form = document.getElementById('company-form');
-    if(!form.reportValidity()) return;
-    const fd = new FormData(form);
-    const id = el.dataset.id;
-    const payload = {name:fd.get('name').trim(), industry:fd.get('industry').trim()||null, website:fd.get('website').trim()||null, notes:fd.get('notes').trim()||null};
-    const q = id ? sb.from('companies').update(payload).eq('id', id) : sb.from('companies').insert(payload);
-    const {data, error} = await q.select().single();
-    if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('companies', mapCompanyFromDb(data));
-    modal=null; render(); toast('Company saved');
-  });
-
-  bind('save-deal', async (el)=>{
-    const form = document.getElementById('deal-form');
-    if(!form.reportValidity()) return;
-    const fd = new FormData(form);
-    const id = el.dataset.id;
-    const payload = {
-      title:fd.get('title').trim(), value:Number(fd.get('value'))||0, stage:fd.get('stage'),
-      company_id:fd.get('companyId')||null, contact_id:fd.get('contactId')||null,
-      close_date: fd.get('closeDate') || null,
-      notes:fd.get('notes').trim()||null
-    };
-    const q = id ? sb.from('deals').update(payload).eq('id', id) : sb.from('deals').insert(payload);
-    const {data, error} = await q.select().single();
-    if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('deals', mapDealFromDb(data));
-    modal=null; render(); toast('Deal saved');
   });
 
   bind('save-task', async (el)=>{
@@ -908,7 +1008,7 @@ function attachGlobalHandlers(){
     const payload = {
       title:fd.get('title').trim(),
       due_date: fd.get('dueDate') || null,
-      contact_id:fd.get('contactId')||null, notes:fd.get('notes').trim()||null
+      contact_id:fd.get('contactId')||null, opportunity_id:fd.get('opportunityId')||null, notes:fd.get('notes').trim()||null
     };
     const q = id ? sb.from('tasks').update(payload).eq('id', id) : sb.from('tasks').insert(payload);
     const {data, error} = await q.select().single();
@@ -917,37 +1017,63 @@ function attachGlobalHandlers(){
     modal=null; render(); toast('Task saved');
   });
 
-  bind('add-activity', async (el)=>{
+  bind('save-opportunity', async (el)=>{
+    const form = document.getElementById('opportunity-form');
+    if(!form.reportValidity()) return;
+    const fd = new FormData(form);
+    const id = el.dataset.id;
+    const payload = {
+      customer_id: fd.get('customerId')||null,
+      project_name: fd.get('projectName').trim()||null,
+      opportunity_type: fd.get('opportunityType')||null,
+      opportunity_number: fd.get('opportunityNumber').trim()||null,
+      rfq_number: fd.get('rfqNumber').trim()||null,
+      rfq_date: fd.get('rfqDate')||null,
+      rfq_date_estimated: fd.get('rfqDateEstimated')==='on',
+      oem_reference_number: fd.get('oemReferenceNumber').trim()||null,
+      priority: fd.get('priority')||null,
+      win_lose: fd.get('winLose'),
+      lose_reason: fd.get('loseReason').trim()||null,
+      ctr_number: fd.get('ctrNumber').trim()||null,
+      po_number: fd.get('poNumber').trim()||null,
+      po_date: fd.get('poDate')||null,
+      po_date_estimated: fd.get('poDateEstimated')==='on',
+      currency: fd.get('currency').trim()||null,
+      po_value: fd.get('poValue') ? Number(fd.get('poValue')) : null,
+      payment_terms: fd.get('paymentTerms')||null,
+      po_principal_id: fd.get('poPrincipalId')||null,
+      lc_status: fd.get('lcStatus'),
+      shipment_status: fd.get('shipmentStatus'),
+      payment_status: fd.get('paymentStatus'),
+      notes: fd.get('notes').trim()||null
+    };
+    const q = id ? sb.from('opportunities').update(payload).eq('id', id) : sb.from('opportunities').insert(payload);
+    const {data, error} = await q.select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    const savedOpp = mapOpportunityFromDb(data);
+    upsertLocal('opportunities', savedOpp);
+
+    const principalIds = Array.from(form.principalIds.selectedOptions).map(o=>o.value);
+    await sb.from('opportunity_principals').delete().eq('opportunity_id', savedOpp.id);
+    if(principalIds.length){
+      await sb.from('opportunity_principals').insert(principalIds.map(pid=>({opportunity_id:savedOpp.id, principal_id:pid})));
+    }
+    await reloadOpportunityPrincipals();
+
+    modal=null; render(); toast('Opportunity saved');
+  });
+
+  bind('add-opportunity-activity', async (el)=>{
     const form = document.getElementById('activity-form');
     const fd = new FormData(form);
     const note = fd.get('note').trim();
     if(!note) return;
-    const payload = {contact_id:el.dataset.id, type:fd.get('type'), note, created_by: session.user.id};
+    const payload = {opportunity_id:el.dataset.id, type:fd.get('type'), note, created_by: session.user.id};
     const {data, error} = await sb.from('activities').insert(payload).select().single();
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('activities', mapActivityFromDb(data));
     render();
   }, 'submit', true);
-
-  // Kanban drag & drop
-  app.querySelectorAll('.deal-card').forEach(card=>{
-    card.addEventListener('dragstart', ()=>{ dragDealId = card.dataset.id; card.classList.add('dragging'); });
-    card.addEventListener('dragend', ()=>{ card.classList.remove('dragging'); });
-  });
-  app.querySelectorAll('.kanban-col-body').forEach(col=>{
-    col.addEventListener('dragover', (e)=>{ e.preventDefault(); col.classList.add('drag-over'); });
-    col.addEventListener('dragleave', ()=>{ col.classList.remove('drag-over'); });
-    col.addEventListener('drop', async (e)=>{
-      e.preventDefault(); col.classList.remove('drag-over');
-      const deal = state.deals.find(d=>d.id===dragDealId);
-      const newStage = col.dataset.stage;
-      if(deal && deal.stage !== newStage){
-        deal.stage = newStage; render();
-        const {error} = await sb.from('deals').update({stage:newStage}).eq('id', deal.id);
-        if(error) toast('Error: '+error.message);
-      }
-    });
-  });
 }
 
 function bind(action, handler, eventType='click', preventDefault){
@@ -960,7 +1086,6 @@ function bind(action, handler, eventType='click', preventDefault){
   });
 }
 function restoreFocus(el){
-  // keep cursor position after re-render on search input
   const val = el.value;
   el.focus();
   el.setSelectionRange(val.length, val.length);
@@ -970,4 +1095,3 @@ render();
 </script>
 </body>
 </html>
-
