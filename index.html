@@ -369,6 +369,15 @@ sb.auth.onAuthStateChange((event, sess)=>{
 
 /* ---------------- Helpers ---------------- */
 function fmtMoney(n, currency){ return (currency?currency+' ':'$') + Number(n||0).toLocaleString(); }
+function sumByCurrency(list){
+  const map = {};
+  list.forEach(o=>{ const c = o.currency || 'USD'; map[c] = (map[c]||0) + Number(o.poValue||0); });
+  return map;
+}
+function currencyLines(map){
+  const entries = Object.entries(map).filter(([,v])=>v);
+  return entries.length ? entries.map(([c,v])=>fmtMoney(v,c)) : [fmtMoney(0)];
+}
 function fmtDate(ts){ if(!ts) return '—'; return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function customerName(id){ const c = state.customers.find(x=>x.id===id); return c? c.name : '—'; }
@@ -519,11 +528,11 @@ function renderDashboard(){
   const openRfqs = rfqs.filter(o=>o.winLose==='pending');
   const won = state.opportunities.filter(o=>o.winLose==='won');
   const lost = state.opportunities.filter(o=>o.winLose==='lost');
-  const wonValue = won.reduce((s,o)=>s+Number(o.poValue||0),0);
+  const wonByCurrency = sumByCurrency(won);
   const orders = state.opportunities.filter(o=>o.pipelineStage==='order');
   const actionNeeded = orders.filter(o=>o.lcStatus==='pending' || o.shipmentStatus==='pending');
   const receivable = orders.filter(o=>o.paymentStatus!=='received');
-  const receivableValue = receivable.reduce((s,o)=>s+Number(o.poValue||0),0);
+  const receivableByCurrency = sumByCurrency(receivable);
 
   const openTasks = state.tasks.filter(t=>!t.done);
   const overdueTasks = openTasks.filter(t=>t.dueDate && t.dueDate < Date.now());
@@ -544,8 +553,8 @@ function renderDashboard(){
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-label">Open Leads</div><div class="stat-value">${openLeads.length}</div><div class="stat-sub">${leads.length} total</div></div>
     <div class="stat-card"><div class="stat-label">Open RFQs</div><div class="stat-value">${openRfqs.length}</div><div class="stat-sub">${won.length} won · ${lost.length} lost</div></div>
-    <div class="stat-card"><div class="stat-label">Won Value</div><div class="stat-value">${fmtMoney(wonValue)}</div><div class="stat-sub">${won.length} order${won.length!==1?'s':''}</div></div>
-    <div class="stat-card"><div class="stat-label">Awaiting Payment</div><div class="stat-value">${fmtMoney(receivableValue)}</div><div class="stat-sub">${receivable.length} order${receivable.length!==1?'s':''}</div></div>
+    <div class="stat-card"><div class="stat-label">Won Value</div>${currencyLines(wonByCurrency).map(l=>`<div class="stat-value" style="${currencyLines(wonByCurrency).length>1?'font-size:18px;':''}">${l}</div>`).join('')}<div class="stat-sub">${won.length} order${won.length!==1?'s':''}</div></div>
+    <div class="stat-card"><div class="stat-label">Awaiting Payment</div>${currencyLines(receivableByCurrency).map(l=>`<div class="stat-value" style="${currencyLines(receivableByCurrency).length>1?'font-size:18px;':''}">${l}</div>`).join('')}<div class="stat-sub">${receivable.length} order${receivable.length!==1?'s':''}</div></div>
   </div>
 
   <div class="dash-grid">
@@ -683,9 +692,9 @@ function renderPayments(){
   <div class="kanban">
     ${PAYMENT_COLUMNS.map(col=>{
       const cards = orders.filter(o=>o.paymentStatus===col.id);
-      const total = cards.reduce((s,o)=>s+Number(o.poValue||0),0);
+      const totalLines = currencyLines(sumByCurrency(cards));
       return `<div class="kanban-col">
-        <div class="kanban-col-header" style="border-color:${col.color}"><span>${col.label} <span class="sub-text">(${cards.length})</span></span><span>${fmtMoney(total)}</span></div>
+        <div class="kanban-col-header" style="border-color:${col.color}"><span>${col.label} <span class="sub-text">(${cards.length})</span></span><span>${totalLines.join(' · ')}</span></div>
         <div class="kanban-col-body" data-board="payment" data-col="${col.id}">
           ${cards.map(o=>`
             <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
