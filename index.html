@@ -265,6 +265,7 @@ let authChecked = false;
 let authError = '';
 let authLoading = false;
 let dataLoaded = false;
+let passwordRecoveryMode = false;
 
 /* ---------------- Auth & data bootstrap ---------------- */
 function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||''}; }
@@ -361,8 +362,9 @@ sb.auth.getSession().then(({data})=>{
 sb.auth.onAuthStateChange((event, sess)=>{
   session = sess;
   authChecked = true;
-  if(session && !dataLoaded){ bootstrap(); }
-  else if(!session){ dataLoaded=false; state={profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
+  if(event === 'PASSWORD_RECOVERY'){ passwordRecoveryMode = true; render(); return; }
+  if(session && !dataLoaded && !passwordRecoveryMode){ bootstrap(); }
+  else if(!session){ dataLoaded=false; passwordRecoveryMode=false; state={profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
 });
 
 /* ---------------- Helpers ---------------- */
@@ -393,6 +395,7 @@ function toast(msg){
 function render(){
   const app = document.getElementById('app');
   if(!authChecked){ app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading…</div></div>`; return; }
+  if(passwordRecoveryMode){ app.innerHTML = renderSetPassword(); attachSetPasswordHandlers(); return; }
   if(!session){ app.innerHTML = renderLogin(); attachAuthHandlers(); return; }
   if(!dataLoaded){ app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading your CRM…</div></div>`; return; }
   app.innerHTML = `${renderSidebar()}<div class="main">${renderView()}</div>${modal ? renderModal() : ''}`;
@@ -426,6 +429,41 @@ function attachAuthHandlers(){
     const {error} = await sb.auth.signInWithPassword({email:fd.get('email').trim(), password:fd.get('password')});
     authLoading = false;
     if(error){ authError = error.message; render(); }
+  });
+}
+
+function renderSetPassword(){
+  return `
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand" style="border:none;justify-content:center;margin-bottom:6px;">${maqLogo(200,'on-light')}</div>
+      <div class="sub-text" style="text-align:center;margin-bottom:20px;">Set a new password for your account</div>
+      ${authError ? `<div class="auth-error">${esc(authError)}</div>` : ''}
+      <form id="set-password-form">
+        <div class="field"><label>New password</label><input name="password" type="password" minlength="6" required autocomplete="new-password"></div>
+        <div class="field"><label>Confirm password</label><input name="confirm" type="password" minlength="6" required autocomplete="new-password"></div>
+        <button class="btn" type="submit" style="width:100%;justify-content:center;" ${authLoading?'disabled':''}>${authLoading?'Saving…':'Save password'}</button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function attachSetPasswordHandlers(){
+  const form = document.getElementById('set-password-form');
+  if(!form) return;
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(form);
+    const password = fd.get('password'), confirm = fd.get('confirm');
+    if(password !== confirm){ authError = 'Passwords do not match.'; render(); return; }
+    authLoading = true; authError=''; render();
+    const {error} = await sb.auth.updateUser({password});
+    authLoading = false;
+    if(error){ authError = error.message; render(); return; }
+    passwordRecoveryMode = false;
+    authError = '';
+    toast('Password set — you\'re signed in.');
+    bootstrap();
   });
 }
 
