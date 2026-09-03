@@ -355,7 +355,11 @@ function subscribeRealtime(){
     .subscribe();
 }
 
+let bootstrapStarted = false;
+
 async function bootstrap(){
+  if(bootstrapStarted) return;
+  bootstrapStarted = true;
   await loadAllData();
   subscribeRealtime();
   dataLoaded = true;
@@ -371,8 +375,8 @@ sb.auth.onAuthStateChange((event, sess)=>{
   session = sess;
   authChecked = true;
   if(event === 'PASSWORD_RECOVERY'){ passwordRecoveryMode = true; render(); return; }
-  if(session && !dataLoaded && !passwordRecoveryMode){ bootstrap(); }
-  else if(!session){ dataLoaded=false; passwordRecoveryMode=false; state={profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
+  if(session && !bootstrapStarted && !passwordRecoveryMode){ bootstrap(); }
+  else if(!session){ dataLoaded=false; bootstrapStarted=false; passwordRecoveryMode=false; state={profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
 });
 
 /* ---------------- Helpers ---------------- */
