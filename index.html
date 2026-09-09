@@ -260,6 +260,8 @@ const PAYMENT_COLUMNS = [
   {id:'in_progress', label:'In Progress', color:'#2563eb'},
   {id:'received', label:'Received', color:'#16a34a'},
 ];
+const DEPARTMENTS = ['Instrumentation & Commissioning','Transmission & Distribution','Oil & Gas','Exploration & Production','Power & Business Development'];
+const ROLES = [{id:'employee', label:'Employee'}, {id:'manager', label:'Manager'}, {id:'admin', label:'Admin'}];
 
 /* ---------------- State ---------------- */
 let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
@@ -276,7 +278,8 @@ let dataLoaded = false;
 let passwordRecoveryMode = false;
 
 /* ---------------- Auth & data bootstrap ---------------- */
-function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||''}; }
+function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||'', department:r.department||'', role:r.role||'employee'}; }
+function currentProfile(){ return session ? state.profiles.find(p=>p.id===session.user.id) : null; }
 function mapCustomerFromDb(r){ return {id:r.id, name:r.name, industry:r.industry||'', website:r.website||'', notes:r.notes||''}; }
 function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||''}; }
 function mapContactFromDb(r){ return {id:r.id, name:r.name, email:r.email||'', phone:r.phone||'', title:r.title||'', customerId:r.customer_id||'', notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
@@ -284,7 +287,7 @@ function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ?
 function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
 function mapOpportunityFromDb(r){
   return {
-    id:r.id, pipelineStage:r.pipeline_stage||'rfq',
+    id:r.id, pipelineStage:r.pipeline_stage||'rfq', department:r.department||'',
     customerId:r.customer_id||'', projectName:r.project_name||'', itemProduct:r.item_product||'', assignedTo:r.assigned_to||'',
     leadStatus:r.lead_status||'to_do', leadSource:r.lead_source||'', leadScore:r.lead_score,
     opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
@@ -501,6 +504,7 @@ function renderSidebar(){
     {id:'contacts', icon:'👤', label:'Contacts'},
     {id:'tasks', icon:'✅', label:'Tasks'},
   ];
+  const isAdmin = currentProfile() && currentProfile().role === 'admin';
   const navItem = i => `<div class="nav-item ${view===i.id?'active':''}" data-nav="${i.id}"><span class="nav-icon">${i.icon}</span> ${i.label}</div>`;
   return `
   <div class="sidebar">
@@ -510,6 +514,7 @@ function renderSidebar(){
     ${pipelineItems.map(navItem).join('')}
     <div class="nav-group-label">Records</div>
     ${otherItems.map(navItem).join('')}
+    ${isAdmin ? `<div class="nav-group-label">Admin</div>${navItem({id:'team', icon:'🧑‍💼', label:'Team'})}` : ''}
     <div class="sidebar-footer">
       <div class="sub-text" style="margin-bottom:8px;word-break:break-all;">${esc(session.user.email)}</div>
       <button class="btn-ghost-sm" data-action="sign-out">Sign out</button>
@@ -528,6 +533,7 @@ function renderView(){
     case 'principals': return renderPrincipals();
     case 'contacts': return renderContacts();
     case 'tasks': return renderTasks();
+    case 'team': return renderTeam();
     default: return '';
   }
 }
@@ -830,6 +836,31 @@ function renderTasks(){
   `;
 }
 
+/* ---------------- Team (admin only) ---------------- */
+function renderTeam(){
+  const rows = [...state.profiles].sort((a,b)=>a.email.localeCompare(b.email));
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Team</h1><div class="page-subtitle">${rows.length} accounts · set each teammate's department and role</div></div>
+  </div>
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th></th></tr></thead>
+      <tbody>
+        ${rows.map(p=>`
+          <tr data-team-row="${p.id}">
+            <td>${esc(p.fullName)}</td>
+            <td class="sub-text">${esc(p.email)}</td>
+            <td><select data-field="department" style="min-width:200px;"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===p.department?'selected':''}>${d}</option>`).join('')}</select></td>
+            <td><select data-field="role" style="min-width:110px;">${ROLES.map(r=>`<option value="${r.id}" ${r.id===p.role?'selected':''}>${r.label}</option>`).join('')}</select></td>
+            <td onclick="event.stopPropagation()"><button class="btn btn-sm" data-action="save-team-member" data-id="${p.id}">Save</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
 /* ---------------- Modals ---------------- */
 function customerOptions(selectedId){ return `<option value="">—</option>` + state.customers.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join(''); }
 function principalOptions(selectedId){ return `<option value="">—</option>` + state.principals.map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${esc(p.name)}</option>`).join(''); }
@@ -931,7 +962,8 @@ function renderTaskForm(){
 function renderOpportunityForm(){
   const editing = modal.id ? state.opportunities.find(o=>o.id===modal.id) : null;
   const startStage = modal.startStage || (editing ? editing.pipelineStage : 'rfq');
-  const o = editing || {pipelineStage:startStage,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',contactMethod:'',rfqStatus:'not_started',winLose: startStage==='order' ? 'won' : 'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
+  const myDept = currentProfile() ? currentProfile().department : '';
+  const o = editing || {pipelineStage:startStage,department:myDept,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',contactMethod:'',rfqStatus:'not_started',winLose: startStage==='order' ? 'won' : 'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
   const rfqDateVal = o.rfqDate ? new Date(o.rfqDate).toISOString().slice(0,10) : '';
   const poDateVal = o.poDate ? new Date(o.poDate).toISOString().slice(0,10) : '';
   const saleDateVal = o.saleDate ? new Date(o.saleDate).toISOString().slice(0,10) : '';
@@ -947,7 +979,10 @@ function renderOpportunityForm(){
         <div class="field"><label>Project / Description</label><input name="projectName" value="${esc(o.projectName)}"></div>
         <div class="field"><label>Item / Product</label><input name="itemProduct" value="${esc(o.itemProduct)}"></div>
       </div>
-      <div class="field"><label>Assigned To</label><select name="assignedTo">${profileOptions(o.assignedTo)}</select></div>
+      <div class="field-row">
+        <div class="field"><label>Assigned To</label><select name="assignedTo">${profileOptions(o.assignedTo)}</select></div>
+        <div class="field"><label>Department</label><select name="department"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===o.department?'selected':''}>${d}</option>`).join('')}</select></div>
+      </div>
 
       ${isLead ? `
       <div class="form-section-title">Lead</div>
@@ -1106,6 +1141,17 @@ function attachGlobalHandlers(){
     removeLocal('tasks', id); modal=null; render(); toast('Task deleted');
   });
 
+  bind('save-team-member', async (el)=>{
+    const id = el.dataset.id;
+    const row = document.querySelector(`[data-team-row="${id}"]`);
+    const department = row.querySelector('[data-field="department"]').value || null;
+    const role = row.querySelector('[data-field="role"]').value;
+    const {data, error} = await sb.from('profiles').update({department, role}).eq('id', id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('profiles', mapProfileFromDb(data));
+    render(); toast('Team member updated');
+  });
+
   bind('toggle-task', async (el)=>{
     const id = el.dataset.id; const done = el.checked;
     const {data, error} = await sb.from('tasks').update({done}).eq('id', id).select().single();
@@ -1177,6 +1223,7 @@ function attachGlobalHandlers(){
       project_name: fd.get('projectName').trim()||null,
       item_product: fd.get('itemProduct').trim()||null,
       assigned_to: fd.get('assignedTo')||null,
+      department: fd.get('department')||null,
       notes: fd.get('notes').trim()||null,
     };
     if(stage === 'lead'){
