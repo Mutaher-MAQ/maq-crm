@@ -251,6 +251,7 @@ const LEAD_COLUMNS = [
 const RFQ_COLUMNS = [
   {id:'not_started', label:'Not Started', color:'#dc2626'},
   {id:'in_progress', label:'In Progress', color:'#2563eb'},
+  {id:'offer_submitted', label:'Offer Submitted', color:'#0891b2'},
   {id:'awaiting_response', label:'Awaiting Response', color:'#d97706'},
   {id:'not_interested', label:'Not Interested', color:'#9333ea'},
   {id:'won', label:'Won (drop to promote)', color:'#16a34a'},
@@ -293,7 +294,7 @@ function mapOpportunityFromDb(r){
     opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
     rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
-    followUpAction:r.follow_up_action||'', contactMethod:r.contact_method||'', rfqStatus:r.rfq_status||'not_started',
+    followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:r.rfq_status||'not_started',
     winLose:r.win_lose||'pending', loseReason:r.lose_reason||'',
     ctrNumber:r.ctr_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
     currency:r.currency||'', poValue:Number(r.po_value)||0, paymentTerms:r.payment_terms||'', poPrincipalId:r.po_principal_id||'',
@@ -345,8 +346,15 @@ function applyRealtimeChange(collection, mapFn, payload){
   render();
 }
 
+let realtimeChannel = null;
+
+function unsubscribeRealtime(){
+  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+}
+
 function subscribeRealtime(){
-  sb.channel('crm-changes')
+  unsubscribeRealtime();
+  realtimeChannel = sb.channel('crm-changes')
     .on('postgres_changes', {event:'*', schema:'public', table:'profiles'}, p=>applyRealtimeChange('profiles', mapProfileFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'customers'}, p=>applyRealtimeChange('customers', mapCustomerFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'principals'}, p=>applyRealtimeChange('principals', mapPrincipalFromDb, p))
@@ -359,27 +367,46 @@ function subscribeRealtime(){
 }
 
 let bootstrapStarted = false;
+let loadedUserId = null;
 
 async function bootstrap(){
   if(bootstrapStarted) return;
   bootstrapStarted = true;
-  await loadAllData();
-  subscribeRealtime();
-  dataLoaded = true;
+  const userId = session && session.user.id;
+  try {
+    await loadAllData();
+    if(!session || session.user.id !== userId) return; // user changed/signed out mid-load
+    subscribeRealtime();
+    loadedUserId = userId;
+    dataLoaded = true;
+  } catch(e){
+    console.error('Failed to load CRM data', e);
+    bootstrapStarted = false;
+    authError = 'Could not load your data. Please sign in again.';
+    await sb.auth.signOut();
+    return;
+  }
   render();
 }
 
-sb.auth.getSession().then(({data})=>{
-  session = data.session;
-  authChecked = true;
-  if(session) bootstrap(); else render();
-});
+function resetAppState(){
+  unsubscribeRealtime();
+  dataLoaded = false; bootstrapStarted = false; loadedUserId = null;
+  modal = null; view = 'dashboard'; searchQuery = '';
+  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]};
+}
+
+// Never await Supabase calls inside onAuthStateChange (it deadlocks the auth lock) — defer with setTimeout.
 sb.auth.onAuthStateChange((event, sess)=>{
   session = sess;
   authChecked = true;
-  if(event === 'PASSWORD_RECOVERY'){ passwordRecoveryMode = true; render(); return; }
-  if(session && !bootstrapStarted && !passwordRecoveryMode){ bootstrap(); }
-  else if(!session){ dataLoaded=false; bootstrapStarted=false; passwordRecoveryMode=false; state={profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]}; render(); }
+  setTimeout(()=>{
+    if(event === 'PASSWORD_RECOVERY'){ passwordRecoveryMode = true; render(); return; }
+    if(!session){ passwordRecoveryMode = false; resetAppState(); render(); return; }
+    if(loadedUserId && loadedUserId !== session.user.id) resetAppState(); // switched account
+    if(!bootstrapStarted && !passwordRecoveryMode) bootstrap();
+    render();
+  }, 0);
 });
 
 /* ---------------- Helpers ---------------- */
@@ -394,6 +421,8 @@ function currencyLines(map){
   return entries.length ? entries.map(([c,v])=>fmtMoney(v,c)) : [fmtMoney(0)];
 }
 function fmtDate(ts){ if(!ts) return '—'; return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+// yyyy-mm-dd in local time, for <input type="date"> (toISOString would shift it a day back east of UTC)
+function isoDay(ts){ if(!ts) return ''; const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function customerName(id){ const c = state.customers.find(x=>x.id===id); return c? c.name : '—'; }
 function principalName(id){ const p = state.principals.find(x=>x.id===id); return p? p.name : '—'; }
@@ -554,6 +583,7 @@ function renderDashboard(){
 
   const openTasks = state.tasks.filter(t=>!t.done);
   const overdueTasks = openTasks.filter(t=>t.dueDate && t.dueDate < Date.now());
+  const dueFollowUps = followUpsDue();
   const recentActivities = [...state.activities].sort((a,b)=>b.timestamp-a.timestamp).slice(0,6);
   const upcomingTasks = [...openTasks].sort((a,b)=>(a.dueDate||0)-(b.dueDate||0)).slice(0,6);
 
@@ -579,6 +609,12 @@ function renderDashboard(){
     <div class="panel">
       <div class="panel-title">Pipeline Funnel</div>
       ${funnelBars.map(b=>`<div class="bar-row"><div class="bar-label">${b.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round((b.count/maxCount)*100)}%;background:${b.color}"></div></div><div class="bar-value">${b.count}</div></div>`).join('')}
+      <div class="panel-title" style="margin-top:22px;">Follow-Ups Due ${dueFollowUps.length?`<span class="badge badge-red">${dueFollowUps.length}</span>`:''}</div>
+      ${dueFollowUps.length ? dueFollowUps.slice(0,8).map(({o,f})=>`
+        <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
+          <div class="task-title">${esc(o.projectName||o.itemProduct||'RFQ')}<div class="sub-text">${esc(customerName(o.customerId))}${o.followUpAction?' · '+esc(FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)?.label||''):''}${o.assignedTo?' · '+esc(profileName(o.assignedTo)):''}</div></div>
+          <span class="badge ${f.badge}">${f.label}</span>
+        </div>`).join('') + (dueFollowUps.length>8?`<div class="sub-text">+${dueFollowUps.length-8} more on the RFQ board</div>`:'') : `<div class="sub-text">No follow-ups due 🎉</div>`}
       <div class="panel-title" style="margin-top:22px;">Orders — Action Needed</div>
       ${actionNeeded.length ? actionNeeded.map(o=>`
         <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
@@ -605,6 +641,36 @@ function renderDashboard(){
   `;
 }
 function activityIcon(type){ return {call:'📞',email:'✉️',meeting:'🗓️',note:'📝'}[type] || '•'; }
+
+/* ---------------- Follow-ups ---------------- */
+// An open RFQ needs chasing when its follow-up date has passed, or (with no
+// date set) when it's been in progress / awaiting response with no logged
+// activity for STALE_DAYS.
+const STALE_DAYS = 7;
+const DAY_MS = 86400000;
+function lastTouch(o){
+  const acts = state.activities.filter(a=>a.opportunityId===o.id).map(a=>a.timestamp);
+  return Math.max(o.createdAt||0, o.rfqDateEstimated ? 0 : (o.rfqDate||0), ...acts);
+}
+function followUpInfo(o){
+  if(o.pipelineStage!=='rfq' || o.winLose!=='pending' || o.rfqStatus==='not_interested') return null;
+  const today = new Date().setHours(0,0,0,0);
+  if(o.followUpDate){
+    const days = Math.round((today - o.followUpDate)/DAY_MS);
+    if(days > 0) return {level:'overdue', days, badge:'badge-red', label:`Follow-up ${days}d overdue`};
+    if(days === 0) return {level:'today', days, badge:'badge-amber', label:'Follow up today'};
+    return null;
+  }
+  if(!['in_progress','offer_submitted','awaiting_response'].includes(o.rfqStatus)) return null;
+  const days = Math.round((today - new Date(lastTouch(o)).setHours(0,0,0,0))/DAY_MS);
+  if(days >= STALE_DAYS) return {level:'stale', days, badge:'badge-amber', label:`No contact ${days}d`};
+  return null;
+}
+function followUpsDue(){
+  const rank = {overdue:0, today:1, stale:2};
+  return state.opportunities.map(o=>({o, f:followUpInfo(o)})).filter(x=>x.f)
+    .sort((a,b)=> rank[a.f.level]-rank[b.f.level] || b.f.days-a.f.days);
+}
 
 /* ---------------- Leads (Kanban) ---------------- */
 function renderLeads(){
@@ -653,6 +719,7 @@ function renderOpportunities(){
               <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled')}</div>
               <div class="kanban-card-sub">${esc(customerName(o.customerId))} · RFQ# ${esc(o.rfqNumber||'—')}</div>
               <div class="kanban-card-meta"><span class="badge badge-gray">${priorityLabel(o.priority)}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
+              ${(f=>f?`<div class="kanban-card-meta" style="margin-top:6px;"><span class="badge ${f.badge}">⏰ ${f.label}</span></div>`:'')(followUpInfo(o))}
             </div>`).join('')}
         </div>
       </div>`;
@@ -945,7 +1012,7 @@ function renderContactForm(){
 function renderTaskForm(){
   const editing = modal.id ? state.tasks.find(t=>t.id===modal.id) : null;
   const t = editing || {title:'',dueDate:'',contactId:'',opportunityId:'',notes:''};
-  const dueDateVal = t.dueDate ? new Date(t.dueDate).toISOString().slice(0,10) : '';
+  const dueDateVal = isoDay(t.dueDate);
   return modalShell(editing?'Edit Task':'New Task', `
     <form id="task-form">
       <div class="field"><label>Task *</label><input name="title" required value="${esc(t.title)}"></div>
@@ -963,10 +1030,11 @@ function renderOpportunityForm(){
   const editing = modal.id ? state.opportunities.find(o=>o.id===modal.id) : null;
   const startStage = modal.startStage || (editing ? editing.pipelineStage : 'rfq');
   const myDept = currentProfile() ? currentProfile().department : '';
-  const o = editing || {pipelineStage:startStage,department:myDept,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',contactMethod:'',rfqStatus:'not_started',winLose: startStage==='order' ? 'won' : 'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
-  const rfqDateVal = o.rfqDate ? new Date(o.rfqDate).toISOString().slice(0,10) : '';
-  const poDateVal = o.poDate ? new Date(o.poDate).toISOString().slice(0,10) : '';
-  const saleDateVal = o.saleDate ? new Date(o.saleDate).toISOString().slice(0,10) : '';
+  const o = editing || {pipelineStage:startStage,department:myDept,customerId:'',projectName:'',itemProduct:'',assignedTo:'',leadStatus:'to_do',leadSource:'',leadScore:'',opportunityType:'',opportunityNumber:'',rfqNumber:'',rfqDate:null,rfqDateEstimated:false,oemReferenceNumber:'',priority:'',followUpAction:'',followUpDate:null,contactMethod:'',rfqStatus:'not_started',winLose: startStage==='order' ? 'won' : 'pending',loseReason:'',ctrNumber:'',poNumber:'',poDate:null,poDateEstimated:false,currency:'',poValue:'',paymentTerms:'',poPrincipalId:'',lcStatus:'pending',shipmentStatus:'pending',saleDate:null,paymentStatus:'receivable',commissionStatus:'',commissionRate:'',notes:''};
+  const rfqDateVal = isoDay(o.rfqDate);
+  const followUpDateVal = isoDay(o.followUpDate);
+  const poDateVal = isoDay(o.poDate);
+  const saleDateVal = isoDay(o.saleDate);
   const selectedPrincipals = editing ? opportunityPrincipalIds(editing.id) : [];
   const acts = editing ? state.activities.filter(a=>a.opportunityId===editing.id).sort((a,b)=>b.timestamp-a.timestamp) : [];
   const isLead = o.pipelineStage === 'lead';
@@ -1009,6 +1077,7 @@ function renderOpportunityForm(){
         <div class="field"><label>Priority</label><select name="priority"><option value="">—</option>${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===o.priority?'selected':''}>${p.label}</option>`).join('')}</select></div>
         <div class="field"><label>Follow-Up Action</label><select name="followUpAction"><option value="">—</option>${FOLLOW_UP_ACTIONS.map(f=>`<option value="${f.id}" ${f.id===o.followUpAction?'selected':''}>${f.label}</option>`).join('')}</select></div>
       </div>
+      <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="date" value="${followUpDateVal}"></div>
       <div class="field"><label>Contact Method</label><input name="contactMethod" value="${esc(o.contactMethod)}"></div>
       ${!isOrder ? `<div class="field"><label>RFQ Status</label><select name="rfqStatus">${RFQ_COLUMNS.filter(c=>c.id!=='won').map(s=>`<option value="${s.id}" ${s.id===o.rfqStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>` : ''}
       <div class="field-row">
@@ -1239,6 +1308,7 @@ function attachGlobalHandlers(){
       payload.oem_reference_number = fd.get('oemReferenceNumber').trim()||null;
       payload.priority = fd.get('priority')||null;
       payload.follow_up_action = fd.get('followUpAction')||null;
+      payload.follow_up_date = fd.get('followUpDate')||null;
       payload.contact_method = fd.get('contactMethod').trim()||null;
       payload.win_lose = fd.get('winLose');
       payload.lose_reason = fd.get('loseReason').trim()||null;
