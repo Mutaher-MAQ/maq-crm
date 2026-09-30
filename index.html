@@ -173,6 +173,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 /* ---------------- Supabase client ---------------- */
 const SUPABASE_URL = 'https://flbzcafkbypexdgfujqm.supabase.co';
@@ -436,6 +437,14 @@ function lcStatusInfo(id){ return LC_STATUSES.find(x=>x.id===id) || LC_STATUSES[
 function simpleStatusInfo(id){ return SIMPLE_STATUSES.find(x=>x.id===id) || SIMPLE_STATUSES[0]; }
 function opportunityPrincipalIds(oppId){ return state.opportunityPrincipals.filter(x=>x.opportunityId===oppId).map(x=>x.principalId); }
 function esc(s){ return (s===undefined||s===null) ? '' : String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function exportToExcel(filename, headers, rows){
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = headers.map((h,i)=>({wch: Math.max(h.length, ...rows.map(r=>String(r[i]??'').length)) + 2}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
+  toast('Exported '+rows.length+' row'+(rows.length!==1?'s':''));
+}
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -741,7 +750,7 @@ function renderOrders(){
     <div><h1 class="page-title">Orders & POs</h1><div class="page-subtitle">${state.opportunities.filter(o=>o.pipelineStage==='order').length} total</div></div>
     <button class="btn" data-action="new-order">+ New Order</button>
   </div>
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-orders">Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
@@ -804,7 +813,7 @@ function renderCustomers(){
     <div><h1 class="page-title">Customers</h1><div class="page-subtitle">${state.customers.length} total</div></div>
     <button class="btn" data-action="new-customer">+ New Customer</button>
   </div>
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search customers..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search customers..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-customers">Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Customer</th><th>Industry</th><th>Website</th><th>Contacts</th><th>Open Opportunities</th><th></th></tr></thead>
@@ -834,7 +843,7 @@ function renderPrincipals(){
     <div><h1 class="page-title">Principals</h1><div class="page-subtitle">${state.principals.length} total · the OEM manufacturers you represent</div></div>
     <button class="btn" data-action="new-principal">+ New Principal</button>
   </div>
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search principals..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search principals..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-principals">Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Principal</th><th>Notes</th><th>Linked Opportunities</th><th></th></tr></thead>
@@ -863,7 +872,7 @@ function renderContacts(){
     <div><h1 class="page-title">Contacts</h1><div class="page-subtitle">${state.contacts.length} total</div></div>
     <button class="btn" data-action="new-contact">+ New Contact</button>
   </div>
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search contacts..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search contacts..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-contacts">Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Name</th><th>Customer</th><th>Email</th><th>Phone</th><th></th></tr></thead>
@@ -1157,6 +1166,42 @@ function attachGlobalHandlers(){
   bind('new-lead', ()=>{ modal={type:'opportunity-form', id:null, startStage:'lead'}; render(); });
   bind('new-order', ()=>{ modal={type:'opportunity-form', id:null, startStage:'order'}; render(); });
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
+
+  bind('export-orders', ()=>{
+    const q = searchQuery.toLowerCase();
+    const rows = state.opportunities.filter(o => o.pipelineStage==='order' && (
+      !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) ||
+      (o.itemProduct||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
+    )).sort((a,b)=>b.createdAt-a.createdAt);
+    exportToExcel('orders.xlsx',
+      ['Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(o.lcStatus).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
+    );
+  });
+  bind('export-customers', ()=>{
+    const q = searchQuery.toLowerCase();
+    const rows = state.customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.industry||'').toLowerCase().includes(q));
+    exportToExcel('customers.xlsx',
+      ['Customer','Industry','Website','Contacts','Open Opportunities','Notes'],
+      rows.map(c=>[c.name, c.industry||'', c.website||'', state.contacts.filter(p=>p.customerId===c.id).length, state.opportunities.filter(o=>o.customerId===c.id && o.pipelineStage!=='order').length, c.notes||''])
+    );
+  });
+  bind('export-principals', ()=>{
+    const q = searchQuery.toLowerCase();
+    const rows = state.principals.filter(p => !q || p.name.toLowerCase().includes(q));
+    exportToExcel('principals.xlsx',
+      ['Principal','Notes','Linked Opportunities'],
+      rows.map(p=>[p.name, p.notes||'', state.opportunityPrincipals.filter(x=>x.principalId===p.id).length])
+    );
+  });
+  bind('export-contacts', ()=>{
+    const q = searchQuery.toLowerCase();
+    const rows = state.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)).sort((a,b)=>b.createdAt-a.createdAt);
+    exportToExcel('contacts.xlsx',
+      ['Name','Title','Customer','Email','Phone','Notes'],
+      rows.map(c=>[c.name, c.title||'', customerName(c.customerId), c.email||'', c.phone||'', c.notes||''])
+    );
+  });
 
   bind('open-customer', (el)=>{ modal={type:'customer-form', id:el.dataset.id}; render(); });
   bind('open-principal', (el)=>{ modal={type:'principal-form', id:el.dataset.id}; render(); });
