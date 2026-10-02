@@ -144,6 +144,11 @@
 
   .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11.5px;flex-shrink:0;}
   .name-cell{display:flex;align-items:center;gap:10px;}
+  .logo-chip{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid var(--border);display:inline-grid;place-items:center;flex-shrink:0;overflow:hidden;font-weight:700;font-size:11.5px;color:var(--primary);}
+  .logo-chip img{width:100%;height:100%;object-fit:contain;padding:3px;display:block;}
+  .logo-chip.sm{width:26px;height:26px;border-radius:7px;font-size:10px;}
+  .logo-chip.sm img{padding:2px;}
+  .logo-chip.fallback{background:var(--primary-soft);border-color:transparent;}
   .sub-text{font-size:12px;color:var(--muted);}
   .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:600;white-space:nowrap;}
   .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.75;}
@@ -297,6 +302,11 @@ function icon(name, size){
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]||''}</svg>`;
 }
 
+function logoChip(name, url, size){
+  const cls = 'logo-chip' + (size==='sm' ? ' sm' : '');
+  if(url) return `<span class="${cls}"><img src="${esc(url)}" alt="${esc(name)}" loading="lazy" onerror="this.parentNode.classList.add('fallback');this.remove()"></span>`;
+  return `<span class="${cls} fallback">${esc(initials(name))}</span>`;
+}
 function maqLogo(width, extraClass){
   const h = Math.round(width * (26.36/203.387));
   return `<svg class="brand-logo ${extraClass||''}" width="${width}" height="${h}" viewBox="0 0 203.387 26.36" xmlns="http://www.w3.org/2000/svg">
@@ -400,7 +410,7 @@ let passwordRecoveryMode = false;
 function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||'', department:r.department||'', role:r.role||'employee'}; }
 function currentProfile(){ return session ? state.profiles.find(p=>p.id===session.user.id) : null; }
 function mapCustomerFromDb(r){ return {id:r.id, name:r.name, industry:r.industry||'', website:r.website||'', notes:r.notes||''}; }
-function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||''}; }
+function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||'', logoUrl:r.logo_url||''}; }
 function mapContactFromDb(r){ return {id:r.id, name:r.name, email:r.email||'', phone:r.phone||'', title:r.title||'', customerId:r.customer_id||'', notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
 function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, done:!!r.done, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', notes:r.notes||''}; }
 function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
@@ -902,7 +912,7 @@ function renderOrders(){
             <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
             <td class="mono">${esc(o.poNumber||'—')}</td>
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
-            <td>${esc(principalName(o.poPrincipalId))}</td>
+            <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
             <td class="num">${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
             <td><span class="badge ${lc.badge}">${lc.label}</span></td>
             <td><span class="badge ${sh.badge}">${sh.label}</span></td>
@@ -992,7 +1002,7 @@ function renderPrincipals(){
           const oppCount = state.opportunityPrincipals.filter(x=>x.principalId===p.id).length;
           return `
           <tr data-action="open-principal" data-id="${p.id}">
-            <td><div class="name-cell"><div class="avatar">${initials(p.name)}</div><div>${esc(p.name)}</div></div></td>
+            <td><div class="name-cell">${logoChip(p.name,p.logoUrl)}<div>${esc(p.name)}</div></div></td>
             <td class="sub-text">${esc(p.notes||'—')}</td><td>${oppCount}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-principal" data-id="${p.id}">${icon('trash',16)}</button></td>
           </tr>`;
@@ -1128,11 +1138,14 @@ function renderCustomerForm(){
 
 function renderPrincipalForm(){
   const editing = modal.id ? state.principals.find(p=>p.id===modal.id) : null;
-  const p = editing || {name:'',notes:''};
+  const p = editing || {name:'',notes:'',logoUrl:''};
   const relatedOpps = editing ? state.opportunities.filter(o=>opportunityPrincipalIds(o.id).includes(editing.id)) : [];
   return modalShell(editing?'Edit Principal':'New Principal', `
     <form id="principal-form">
       <div class="field"><label>Principal Name *</label><input name="name" required value="${esc(p.name)}"></div>
+      <div class="field"><label>Logo (image URL or path)</label>
+        <div style="display:flex;gap:12px;align-items:center;">${logoChip(p.name||'New', p.logoUrl)}<input name="logoUrl" value="${esc(p.logoUrl||'')}" placeholder="logos/example.png or https://…"></div>
+      </div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(p.notes)}</textarea></div>
     </form>
     ${editing && relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Linked Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} — ${esc(customerName(o.customerId))}</div>`).join('')}</div>` : ''}
@@ -1433,7 +1446,7 @@ function attachGlobalHandlers(){
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
-    const payload = {name:fd.get('name').trim(), notes:fd.get('notes').trim()||null};
+    const payload = {name:fd.get('name').trim(), notes:fd.get('notes').trim()||null, logo_url:(fd.get('logoUrl')||'').trim()||null};
     const q = id ? sb.from('principals').update(payload).eq('id', id) : sb.from('principals').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
