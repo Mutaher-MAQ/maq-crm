@@ -1227,7 +1227,7 @@ function renderOpportunityForm(){
         <div class="field"><label>Opportunity Type</label><select name="opportunityType"><option value="">—</option>${OPPORTUNITY_TYPES.map(t=>`<option value="${t.id}" ${t.id===o.opportunityType?'selected':''}>${t.label}</option>`).join('')}</select></div>
         <div class="field"><label>Opportunity Number</label><input name="opportunityNumber" value="${esc(o.opportunityNumber)}"></div>
       </div>
-      <div class="field"><label>Principals (OEMs involved — select multiple)</label><select name="principalIds" multiple size="4">${state.principals.map(p=>`<option value="${p.id}" ${selectedPrincipals.includes(p.id)?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Principal (OEM)</label><select name="principalIds">${principalOptions(selectedPrincipals[0])}</select></div>
       <div class="field-row">
         <div class="field"><label>RFQ #</label><input name="rfqNumber" value="${esc(o.rfqNumber)}"></div>
         <div class="field"><label>OEM Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
@@ -1499,6 +1499,8 @@ function attachGlobalHandlers(){
       payload.lead_source = fd.get('leadSource')||null;
       payload.lead_score = fd.get('leadScore') ? Number(fd.get('leadScore')) : null;
       payload.lead_status = fd.get('leadStatus');
+      // Qualifying a lead promotes it straight to the RFQ board
+      if(payload.lead_status === 'qualified'){ payload.pipeline_stage = 'rfq'; payload.rfq_status = 'not_started'; }
     } else {
       payload.opportunity_type = fd.get('opportunityType')||null;
       payload.opportunity_number = fd.get('opportunityNumber').trim()||null;
@@ -1541,13 +1543,13 @@ function attachGlobalHandlers(){
     upsertLocal('opportunities', savedOpp);
 
     if(form.principalIds){
-      const principalIds = Array.from(form.principalIds.selectedOptions).map(o=>o.value);
+      const principalIds = Array.from(form.principalIds.selectedOptions).map(o=>o.value).filter(Boolean);
       await sb.from('opportunity_principals').delete().eq('opportunity_id', savedOpp.id);
       if(principalIds.length){ await sb.from('opportunity_principals').insert(principalIds.map(pid=>({opportunity_id:savedOpp.id, principal_id:pid}))); }
       await reloadOpportunityPrincipals();
     }
 
-    modal=null; render(); toast(payload.pipeline_stage==='order' && stage!=='order' ? 'Won! Moved to Orders & POs' : 'Saved');
+    modal=null; render(); toast(payload.pipeline_stage==='order' && stage!=='order' ? 'Won! Moved to Orders & POs' : (payload.pipeline_stage==='rfq' && stage==='lead' ? 'Qualified! Moved to RFQs' : 'Saved'));
   });
 
   bind('add-opportunity-activity', async (el)=>{
@@ -1576,7 +1578,11 @@ function attachGlobalHandlers(){
       const opp = state.opportunities.find(o=>o.id===dragCardId);
       if(!opp) return;
       let payload = null;
-      if(board==='leads' && opp.leadStatus!==colId){ payload = {lead_status:colId}; }
+      if(board==='leads' && opp.leadStatus!==colId){
+        payload = {lead_status:colId};
+        // Qualifying a lead promotes it straight to the RFQ board
+        if(colId==='qualified'){ payload.pipeline_stage='rfq'; payload.rfq_status='not_started'; }
+      }
       else if(board==='rfq'){
         if(colId==='won'){ payload = {win_lose:'won', pipeline_stage:'order'}; }
         else if(colId==='not_interested'){ payload = {rfq_status:'not_interested', win_lose:'lost'}; }
