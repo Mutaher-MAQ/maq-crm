@@ -1042,12 +1042,32 @@ function renderContacts(){
 /* ---------------- Tasks ---------------- */
 function renderTasks(){
   const sorted = [...state.tasks].sort((a,b)=>{ if(a.done !== b.done) return a.done ? 1 : -1; return (a.dueDate||0) - (b.dueDate||0); });
+  // Work pulled live from the RFQ board so the team can see what needs doing
+  const followUps = followUpsDue();
+  const prioRank = {urgent:0, high:1, normal:2, low:3};
+  const toStart = state.opportunities
+    .filter(o=>o.pipelineStage==='rfq' && o.winLose==='pending' && o.rfqStatus==='not_started')
+    .sort((a,b)=> (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2) || (a.createdAt||0) - (b.createdAt||0));
+  const workRow = (o, right) => `
+      <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
+        <div class="task-title">${esc(o.projectName||o.itemProduct||'RFQ')}${o.rfqNumber?` <span class="sub-text">#${esc(o.rfqNumber)}</span>`:''}
+          <div class="sub-text">${esc(customerName(o.customerId))}${o.followUpAction?' · '+esc(FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)?.label||''):''}${o.assignedTo?' · '+esc(profileName(o.assignedTo)):' · Unassigned'}</div>
+        </div>
+        ${right}
+      </div>`;
   return `
   <div class="page-header">
-    <div><h1 class="page-title">Tasks</h1><div class="page-subtitle">${state.tasks.filter(t=>!t.done).length} open</div></div>
+    <div><h1 class="page-title">Tasks</h1><div class="page-subtitle">${state.tasks.filter(t=>!t.done).length} open · ${followUps.length} follow-ups due · ${toStart.length} RFQs to start</div></div>
     <button class="btn" data-action="new-task">+ New Task</button>
   </div>
   <div class="panel">
+    <div class="panel-title">Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}</div>
+    ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span class="badge ${f.badge}">${f.label}</span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
+    <div class="panel-title" style="margin-top:22px;">RFQs To Start ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}</div>
+    ${toStart.length ? toStart.map(o=>workRow(o, `<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
+  </div>
+  <div class="panel">
+    <div class="panel-title">Tasks</div>
     ${sorted.length ? sorted.map(t=>`
       <div class="task-row ${t.done?'done':''}">
         <input type="checkbox" data-action="toggle-task" data-id="${t.id}" ${t.done?'checked':''}>
