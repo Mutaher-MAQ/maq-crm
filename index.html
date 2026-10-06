@@ -442,6 +442,7 @@ function removeLocal(collection, id){
   state[collection] = state[collection].filter(x=>x.id!==id);
 }
 
+let loadWarning = '';
 async function loadAllData(){
   const [pf, cu, pr, ct, op, opr, ta, ac] = await Promise.all([
     sb.from('profiles').select('*'),
@@ -453,6 +454,10 @@ async function loadAllData(){
     sb.from('tasks').select('*'),
     sb.from('activities').select('*'),
   ]);
+  // Surface failed loads instead of silently showing an empty list
+  const failed = [['profiles',pf],['customers',cu],['principals',pr],['contacts',ct],['opportunities',op],['tasks',ta],['activities',ac]].filter(([,r])=>r.error);
+  loadWarning = failed.length ? 'Could not load: ' + failed.map(([n,r])=>`${n} (${r.error.message})`).join('; ') : '';
+  if(loadWarning) console.error(loadWarning);
   state.profiles = (pf.data||[]).map(mapProfileFromDb);
   state.customers = (cu.data||[]).map(mapCustomerFromDb);
   state.principals = (pr.data||[]).map(mapPrincipalFromDb);
@@ -515,6 +520,7 @@ async function bootstrap(){
     return;
   }
   render();
+  if(loadWarning) toast(loadWarning, 12000);
 }
 
 function resetAppState(){
@@ -578,12 +584,12 @@ function exportToExcel(filename, headers, rows){
   XLSX.writeFile(wb, filename);
   toast('Exported '+rows.length+' row'+(rows.length!==1?'s':''));
 }
-function toast(msg){
+function toast(msg, ms=2200){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toast._t);
-  toast._t = setTimeout(()=>t.classList.remove('show'), 2200);
+  toast._t = setTimeout(()=>t.classList.remove('show'), ms);
 }
 
 /* ---------------- Render root ---------------- */
