@@ -422,7 +422,7 @@ function mapOpportunityFromDb(r){
     opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
     rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
-    followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:r.rfq_status||'not_started',
+    followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:r.rfq_status||'not_started',
     winLose:r.win_lose||'pending', loseReason:r.lose_reason||'',
     ctrNumber:r.ctr_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
     currency:r.currency||'', poValue:Number(r.po_value)||0, paymentTerms:r.payment_terms||'', poPrincipalId:r.po_principal_id||'',
@@ -1045,9 +1045,19 @@ function renderTasks(){
   // Work pulled live from the RFQ board so the team can see what needs doing
   const followUps = followUpsDue();
   const prioRank = {urgent:0, high:1, normal:2, low:3};
+  // Not-started RFQs, plus any in-progress RFQ that has an offer due date. Soonest due first.
   const toStart = state.opportunities
-    .filter(o=>o.pipelineStage==='rfq' && o.winLose==='pending' && o.rfqStatus==='not_started')
-    .sort((a,b)=> (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2) || (a.createdAt||0) - (b.createdAt||0));
+    .filter(o=>o.pipelineStage==='rfq' && o.winLose==='pending' && (o.rfqStatus==='not_started' || (o.rfqStatus==='in_progress' && o.dueDate)))
+    .sort((a,b)=> (a.dueDate||Infinity) - (b.dueDate||Infinity) || (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2) || (a.createdAt||0) - (b.createdAt||0));
+  const today0 = new Date().setHours(0,0,0,0);
+  const dueBadge = o => {
+    if(!o.dueDate) return '';
+    const d = Math.round((o.dueDate - today0)/DAY_MS);
+    if(d < 0) return `<span class="badge badge-red">Due ${-d}d overdue</span>`;
+    if(d === 0) return `<span class="badge badge-red">Due today</span>`;
+    if(d <= 3) return `<span class="badge badge-amber">Due in ${d}d</span>`;
+    return `<span class="badge badge-gray">Due ${fmtDate(o.dueDate)}</span>`;
+  };
   const workRow = (o, right) => `
       <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
         <div class="task-title">${esc(o.projectName||o.itemProduct||'RFQ')}${o.rfqNumber?` <span class="sub-text">#${esc(o.rfqNumber)}</span>`:''}
@@ -1057,14 +1067,14 @@ function renderTasks(){
       </div>`;
   return `
   <div class="page-header">
-    <div><h1 class="page-title">Tasks</h1><div class="page-subtitle">${state.tasks.filter(t=>!t.done).length} open · ${followUps.length} follow-ups due · ${toStart.length} RFQs to start</div></div>
+    <div><h1 class="page-title">Tasks</h1><div class="page-subtitle">${state.tasks.filter(t=>!t.done).length} open · ${followUps.length} follow-ups due · ${toStart.length} RFQs to work on</div></div>
     <button class="btn" data-action="new-task">+ New Task</button>
   </div>
   <div class="panel">
     <div class="panel-title">Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}</div>
     ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span class="badge ${f.badge}">${f.label}</span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
-    <div class="panel-title" style="margin-top:22px;">RFQs To Start ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}</div>
-    ${toStart.length ? toStart.map(o=>workRow(o, `<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
+    <div class="panel-title" style="margin-top:22px;">RFQs To Work On ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}</div>
+    ${toStart.length ? toStart.map(o=>workRow(o, `<span style="display:flex;gap:6px;align-items:center;">${dueBadge(o)}<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span></span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
   </div>
   <div class="panel">
     <div class="panel-title">Tasks</div>
@@ -1259,7 +1269,10 @@ function renderOpportunityForm(){
         <div class="field"><label>Priority</label><select name="priority"><option value="">—</option>${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===o.priority?'selected':''}>${p.label}</option>`).join('')}</select></div>
         <div class="field"><label>Follow-Up Action</label><select name="followUpAction"><option value="">—</option>${FOLLOW_UP_ACTIONS.map(f=>`<option value="${f.id}" ${f.id===o.followUpAction?'selected':''}>${f.label}</option>`).join('')}</select></div>
       </div>
-      <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="date" value="${followUpDateVal}"></div>
+      <div class="field-row">
+        ${!isOrder ? `<div class="field"><label>Offer Due Date</label><input name="dueDate" type="date" value="${isoDay(o.dueDate)}"></div>` : ''}
+        <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="date" value="${followUpDateVal}"></div>
+      </div>
       <div class="field"><label>Contact Method</label><input name="contactMethod" value="${esc(o.contactMethod)}"></div>
       ${!isOrder ? `<div class="field"><label>RFQ Status</label><select name="rfqStatus">${RFQ_COLUMNS.filter(c=>c.id!=='won').map(s=>`<option value="${s.id}" ${s.id===o.rfqStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>` : ''}
       <div class="field-row">
@@ -1531,6 +1544,7 @@ function attachGlobalHandlers(){
       payload.priority = fd.get('priority')||null;
       payload.follow_up_action = fd.get('followUpAction')||null;
       payload.follow_up_date = fd.get('followUpDate')||null;
+      if(stage !== 'order') payload.due_date = fd.get('dueDate')||null;
       payload.contact_method = fd.get('contactMethod').trim()||null;
       payload.win_lose = fd.get('winLose');
       payload.lose_reason = fd.get('loseReason').trim()||null;
