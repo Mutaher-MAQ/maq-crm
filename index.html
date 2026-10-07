@@ -1057,12 +1057,13 @@ function renderTasks(){
     .sort((a,b)=> (a.dueDate||Infinity) - (b.dueDate||Infinity) || (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2) || (a.createdAt||0) - (b.createdAt||0));
   const today0 = new Date().setHours(0,0,0,0);
   const dueBadge = o => {
-    if(!o.dueDate) return '';
+    if(!o.dueDate) return `<span class="sub-text">No due date</span>`;
     const d = Math.round((o.dueDate - today0)/DAY_MS);
-    if(d < 0) return `<span class="badge badge-red">Due ${-d}d overdue</span>`;
+    const when = fmtDate(o.dueDate);
+    if(d < 0) return `<span class="badge badge-red">Due ${when} · ${-d}d overdue</span>`;
     if(d === 0) return `<span class="badge badge-red">Due today</span>`;
-    if(d <= 3) return `<span class="badge badge-amber">Due in ${d}d</span>`;
-    return `<span class="badge badge-gray">Due ${fmtDate(o.dueDate)}</span>`;
+    if(d <= 3) return `<span class="badge badge-amber">Due ${when} · in ${d}d</span>`;
+    return `<span class="badge badge-gray">Due ${when}</span>`;
   };
   const workRow = (o, right) => `
       <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
@@ -1078,7 +1079,7 @@ function renderTasks(){
   </div>
   <div class="panel">
     <div class="panel-title">Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}</div>
-    ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span class="badge ${f.badge}">${f.label}</span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
+    ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span style="display:flex;gap:8px;align-items:center;"><span class="sub-text">${o.followUpDate ? 'Due '+fmtDate(o.followUpDate) : 'Last contact '+fmtDate(lastTouch(o))}</span><span class="badge ${f.badge}">${f.label}</span></span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
     <div class="panel-title" style="margin-top:22px;">RFQs To Work On ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}</div>
     ${toStart.length ? toStart.map(o=>workRow(o, `<span style="display:flex;gap:6px;align-items:center;">${dueBadge(o)}<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span></span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
   </div>
