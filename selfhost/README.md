@@ -163,10 +163,33 @@ Keeps 30 days locally and copies each backup to a second location. Test a restor
 before every upgrade.
 
 ## Phase 8: Day-to-day
-- **CRM page updates:** automatic via `crm-deploy` (cron). Force a rebuild with `sudo FORCE=1 crm-deploy`.
+- **CRM page updates:** automatic via `crm-deploy` (cron). Force a rebuild with `sudo FORCE=1 crm-deploy`
+  (needed after changing `crm.env`, e.g. a new key).
+- **If deploy stops with a git error** (history was rewritten on GitHub): `git -C /opt/crm-src fetch origin && git -C /opt/crm-src reset --hard origin/main`, then `sudo FORCE=1 crm-deploy`.
+- **If the GitHub repository is made private,** the server can no longer pull anonymously. Create a read-only *deploy key* in the
+  repo's settings, put its private half on the server for the deploy user, and set `REPO=git@github.com:Mutaher-MAQ/maq-crm.git`
+  in the cron line. (Making it private also switches off the old GitHub Pages address.)
+- **Database changes (SQL).** Every change comes as a `.sql` file in the repo. Apply it either in Supabase Studio's SQL editor
+  (`http://<vm-ip>:8000`, from the IT PC), or by IT from the server:
+  `docker exec -i supabase-db psql -U postgres -d postgres < migration_xxx.sql`. Both are equivalent; the files are written
+  to be safe to run twice and finish with `notify pgrst, 'reload schema'`.
 - **Update Supabase:** follow Supabase's *Updating* guide; always rehearse on the test VM and snapshot first. Updates
   are frequent; pin a version and move on purpose.
 - **Monitoring:** alert if port 443 stops answering, the certificate is within 14 days of expiry, or the disk passes 80%.
+
+## What has already been simulated (so IT knows what is proven)
+Using a stand-in server with a Supabase-style sign-in and data API on a single address, the build produced by `deploy.sh`
+was run in a real browser:
+- Server pulls from a Git repository, builds 41 files, publishes; a second run with no new commit does nothing; a forced run
+  picks up a changed key.
+- Sign-in, dashboard (multi-currency), Orders & POs department buttons, Tasks page with due dates, qualifying a lead (moves to
+  RFQs), a new RFQ with a single principal and due date, department auto-fill, Team "Also covers" saving, and Excel export library.
+- Every browser request went to the one local address: **no internet requests** (no CDN, no fonts site).
+- The app's own install/offline worker registers and activates on the new address in Chrome.
+- The server's build differs from the live `index.html` in exactly five lines (font links, library tags, address and key);
+  the other ~1,600 lines of CRM code are byte-for-byte identical.
+Not simulated (needs the real stack): Supabase itself, live updates (WebSockets), real e-mail, row-level security on the new
+server, and the data import. Those are the Phase 5 checks.
 
 ## Things to validate on the test VM (not yet tested by the author)
 The web page build (Windows and Linux scripts) was tested, including with all internet access blocked. The server side below
