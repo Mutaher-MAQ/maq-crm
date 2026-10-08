@@ -1,0 +1,44 @@
+# Front door for the CRM, published at https://crm.maqint.com (change the name in ONE place below if IT picks another).
+# Caddy gets and renews the free Let's Encrypt certificate by itself. For that, the firewall must forward
+# TCP 80 and 443 from the public address to this VM (see README, "FortiGate").
+{
+	email it@maqint.com
+}
+
+crm.maqint.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 20mb
+			roll_keep 10
+		}
+	}
+
+	# ONLY the Supabase paths the CRM uses are passed through.
+	# Supabase Studio (admin screen), the database and everything else are NOT reachable from this address.
+	@api path /rest/v1/* /auth/v1/* /realtime/v1/*
+	handle @api {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Everything else is the CRM web page itself (files in /srv/crm, written by deploy.sh)
+	handle {
+		root * /srv/crm
+		header /index.html Cache-Control "no-cache"
+		header /config.js  Cache-Control "no-cache"
+		header /sw.js      Cache-Control "no-cache"
+		file_server
+	}
+}
+
+# Internal-only alternative (no public exposure): remove the `email` line at the top, add `auto_https off`
+# in the global block, and inside the site block add:  tls /certs/crm.crt /certs/crm.key

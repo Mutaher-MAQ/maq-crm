@@ -1,0 +1,14 @@
+# Run in /opt/crm-proxy (next to the Caddyfile):   docker compose -f docker-compose.proxy.yml up -d
+# Host networking so Caddy can reach the Supabase gateway on 127.0.0.1:8000 and answer on ports 80/443.
+services:
+  caddy:
+    image: caddy:2
+    container_name: crm-caddy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/crm:/srv/crm:ro          # the built front end (written by deploy.sh)
+      - caddy_data:/data              # certificates + access log
+volumes:
+  caddy_data:
