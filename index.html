@@ -899,6 +899,7 @@ function renderOpportunities(){
             <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
               <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled')}</div>
               <div class="kanban-card-sub">${esc(customerName(o.customerId))} · RFQ# ${esc(o.rfqNumber||'—')}</div>
+              ${o.poValue ? `<div class="kanban-card-sub" style="font-weight:600;color:var(--primary);">${esc(fmtMoney(o.poValue, o.currency))}</div>` : ''}
               <div class="kanban-card-meta"><span class="badge ${priorityBadge(o.priority)}">${priorityLabel(o.priority)}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
               ${(f=>f?`<div class="kanban-card-meta" style="margin-top:6px;"><span class="badge ${f.badge}">⏰ ${f.label}</span></div>`:'')(followUpInfo(o))}
             </div>`).join('')}
@@ -929,18 +930,19 @@ function renderLost(){
   <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search lost RFQs..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-lost">${icon('download',15)} Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr><th>Customer / Item</th><th>RFQ #</th><th>Principal</th><th>Reason</th><th>Assigned</th><th>Department</th><th></th></tr></thead>
+      <thead><tr><th>Customer / Item</th><th>RFQ #</th><th>Principal</th><th>Value</th><th>Reason</th><th>Assigned</th><th>Department</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(o=>`
           <tr data-action="open-opportunity" data-id="${o.id}">
             <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
             <td class="mono">${esc(o.rfqNumber||'—')}</td>
             <td>${esc(oppPrincipalNames(o)||'—')}</td>
+            <td class="num">${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
             <td>${o.loseReason ? esc(o.loseReason) : '<span class="sub-text">No reason recorded</span>'}</td>
             <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}</td>
             <td class="sub-text">${esc(o.department||'—')}</td>
             <td onclick="event.stopPropagation()"><button class="btn btn-sm btn-secondary" data-action="reopen-rfq" data-id="${o.id}">Reopen</button></td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="7">${searchQuery ? 'No lost RFQs match your search.' : 'No lost RFQs. 🎉'}</td></tr>`}
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="8">${searchQuery ? 'No lost RFQs match your search.' : 'No lost RFQs. 🎉'}</td></tr>`}
       </tbody>
     </table>
   </div>
@@ -1346,6 +1348,10 @@ function renderOpportunityForm(){
         ${!isOrder ? `<div class="field"><label>Offer Due Date</label><input name="dueDate" type="date" value="${isoDay(o.dueDate)}"></div>` : ''}
         <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="date" value="${followUpDateVal}"></div>
       </div>
+      ${!isOrder ? `<div class="field-row">
+        <div class="field"><label>Offer Currency</label><select name="offerCurrency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>Offer Value</label><input name="offerValue" type="number" min="0" step="0.01" value="${o.poValue?esc(o.poValue):''}"></div>
+      </div>` : ''}
       <div class="field"><label>Contact Method</label><input name="contactMethod" value="${esc(o.contactMethod)}"></div>
       ${!isOrder ? `<div class="field"><label>RFQ Status</label><select name="rfqStatus">${RFQ_COLUMNS.filter(c=>c.id!=='won').map(s=>`<option value="${s.id}" ${s.id===o.rfqStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>` : ''}
       <div class="field-row">
@@ -1636,10 +1642,14 @@ function attachGlobalHandlers(){
       payload.lose_reason = fd.get('loseReason').trim()||null;
       if(stage !== 'order'){
         payload.rfq_status = fd.get('rfqStatus');
+        // The offer value is stored in the same columns as the PO value, so it carries over when the RFQ is won
+        payload.currency = fd.get('offerCurrency')||null;
+        payload.po_value = fd.get('offerValue') ? Number(fd.get('offerValue')) : null;
         // Winning an RFQ promotes it straight to Orders & POs
         if(payload.win_lose === 'won'){ payload.pipeline_stage = 'order'; }
       }
-      if(stage === 'order' || payload.pipeline_stage === 'order'){
+      // PO fields only exist on the order form; an RFQ just marked Won keeps its offer value and gets PO details later
+      if(fd.has('ctrNumber') && (stage === 'order' || payload.pipeline_stage === 'order')){
         payload.ctr_number = fd.get('ctrNumber').trim()||null;
         payload.po_number = fd.get('poNumber').trim()||null;
         payload.po_date = fd.get('poDate')||null;
