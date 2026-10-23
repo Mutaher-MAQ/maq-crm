@@ -385,7 +385,6 @@ const RFQ_COLUMNS = [
   {id:'not_started', label:'Not Started', color:'#dc2626'},
   {id:'in_progress', label:'In Progress', color:'#2563eb'},
   {id:'offer_submitted', label:'Offer Submitted', color:'#0891b2'},
-  {id:'awaiting_response', label:'Awaiting Response', color:'#d97706'},
   {id:'not_interested', label:'Not Interested', color:'#9333ea'},
   {id:'won', label:'Won (drop to promote)', color:'#16a34a'},
 ];
@@ -436,7 +435,7 @@ function mapOpportunityFromDb(r){
     opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
     rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
-    followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:r.rfq_status||'not_started',
+    followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:(r.rfq_status==='awaiting_response' ? 'offer_submitted' : r.rfq_status)||'not_started',
     winLose:r.win_lose||'pending', loseReason:r.lose_reason||'',
     ctrNumber:r.ctr_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
     currency:r.currency||'', poValue:Number(r.po_value)||0, paymentTerms:r.payment_terms||'', poPrincipalId:r.po_principal_id||'',
@@ -825,7 +824,7 @@ function activityIcon(type){ const n = {call:'phone',email:'mail',meeting:'calen
 
 /* ---------------- Follow-ups ---------------- */
 // An open RFQ needs chasing when its follow-up date has passed, or (with no
-// date set) when it's been in progress / awaiting response with no logged
+// date set) when it's been in progress / offer submitted with no logged
 // activity for STALE_DAYS.
 const STALE_DAYS = 7;
 const DAY_MS = 86400000;
@@ -890,7 +889,8 @@ function renderOpportunities(){
   </div>
   <div class="kanban">
     ${RFQ_COLUMNS.map(col=>{
-      const cards = col.id==='won' ? [] : rfqs.filter(o=>o.rfqStatus===col.id && o.winLose!=='lost') ;
+      // "awaiting_response" was retired: any leftover record shows under Offer Submitted
+      const cards = col.id==='won' ? [] : rfqs.filter(o=>(o.rfqStatus===col.id || (col.id==='offer_submitted' && o.rfqStatus==='awaiting_response')) && o.winLose!=='lost') ;
       const list = col.id==='not_interested' ? rfqs.filter(o=>o.winLose==='lost' || o.rfqStatus==='not_interested') : cards;
       return `<div class="kanban-col" style="--col:${col.color}">
         <div class="kanban-col-header"><span>${col.label} <span class="count-pill">${list.length}</span></span></div>
