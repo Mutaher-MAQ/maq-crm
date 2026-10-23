@@ -383,7 +383,7 @@ const LEAD_COLUMNS = [
 ];
 const RFQ_COLUMNS = [
   {id:'not_started', label:'Not Started', color:'#dc2626'},
-  {id:'in_progress', label:'In Progress', color:'#2563eb'},
+  {id:'in_progress', label:'In Progress / Awaiting OEM Offer', color:'#2563eb'},
   {id:'offer_submitted', label:'Offer Submitted', color:'#0891b2'},
   {id:'not_interested', label:'Not Interested', color:'#9333ea'},
   {id:'won', label:'Won (drop to promote)', color:'#16a34a'},
@@ -1438,7 +1438,7 @@ function attachGlobalHandlers(){
   });
   bind('reopen-rfq', async (el)=>{
     const o = state.opportunities.find(x=>x.id===el.dataset.id);
-    if(!o || !confirm('Reopen this RFQ? It moves back to "In Progress" on the RFQ board.')) return;
+    if(!o || !confirm('Reopen this RFQ? It moves back to "In Progress / Awaiting OEM Offer" on the RFQ board.')) return;
     const {data, error} = await sb.from('opportunities').update({win_lose:'pending', rfq_status:'in_progress', lose_reason:null}).eq('id', o.id).select().single();
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('opportunities', mapOpportunityFromDb(data));
