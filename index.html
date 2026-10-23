@@ -302,6 +302,7 @@ const ICON_PATHS = {
   calendar:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
   note:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
   lost:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  archive:'<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
 };
 function icon(name, size){
   size = size || 18;
@@ -397,7 +398,7 @@ const DEPARTMENTS = ['Instrumentation & Commissioning','Transmission & Distribut
 const ROLES = [{id:'employee', label:'Employee'}, {id:'manager', label:'Manager'}, {id:'admin', label:'Admin'}];
 
 /* ---------------- State ---------------- */
-let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
+let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
 let view = 'dashboard';
 let navOpen = false;
 let searchQuery = '';
@@ -429,7 +430,7 @@ function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ?
 function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
 function mapOpportunityFromDb(r){
   return {
-    id:r.id, pipelineStage:r.pipeline_stage||'rfq', department:r.department||'',
+    id:r.id, pipelineStage:r.pipeline_stage||'rfq', department:r.department||'', archived:!!r.archived, archivedAt: r.archived_at ? new Date(r.archived_at).getTime() : null,
     customerId:r.customer_id||'', projectName:r.project_name||'', itemProduct:r.item_product||'', assignedTo:r.assigned_to||'',
     leadStatus:r.lead_status||'to_do', leadSource:r.lead_source||'', leadScore:r.lead_score,
     opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
@@ -447,12 +448,20 @@ function mapOpportunityFromDb(r){
 }
 
 function upsertLocal(collection, item){
+  // Archived opportunities live in their own list so every page, total and export ignores them
+  if(collection==='opportunities'){
+    const keep = item.archived ? 'archivedOpportunities' : 'opportunities';
+    const drop = item.archived ? 'opportunities' : 'archivedOpportunities';
+    state[drop] = state[drop].filter(x=>x.id!==item.id);
+    collection = keep;
+  }
   const arr = state[collection];
   const idx = arr.findIndex(x=>x.id===item.id);
   if(idx>-1) arr[idx] = item; else arr.push(item);
 }
 function removeLocal(collection, id){
   state[collection] = state[collection].filter(x=>x.id!==id);
+  if(collection==='opportunities') state.archivedOpportunities = state.archivedOpportunities.filter(x=>x.id!==id);
 }
 
 let loadWarning = '';
@@ -475,7 +484,9 @@ async function loadAllData(){
   state.customers = (cu.data||[]).map(mapCustomerFromDb);
   state.principals = (pr.data||[]).map(mapPrincipalFromDb);
   state.contacts = (ct.data||[]).map(mapContactFromDb);
-  state.opportunities = (op.data||[]).map(mapOpportunityFromDb);
+  const allOpps = (op.data||[]).map(mapOpportunityFromDb);
+  state.opportunities = allOpps.filter(o=>!o.archived);
+  state.archivedOpportunities = allOpps.filter(o=>o.archived);
   state.opportunityPrincipals = (opr.data||[]).map(r=>({opportunityId:r.opportunity_id, principalId:r.principal_id}));
   state.tasks = (ta.data||[]).map(mapTaskFromDb);
   state.activities = (ac.data||[]).map(mapActivityFromDb);
@@ -540,7 +551,7 @@ function resetAppState(){
   unsubscribeRealtime();
   dataLoaded = false; bootstrapStarted = false; loadedUserId = null;
   modal = null; view = 'dashboard'; searchQuery = ''; deptFilter = '';
-  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],opportunityPrincipals:[],tasks:[],activities:[]};
+  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[]};
 }
 
 // Never await Supabase calls inside onAuthStateChange (it deadlocks the auth lock) — defer with setTimeout.
@@ -699,6 +710,7 @@ function renderSidebar(){
     {id:'lost', icon:'lost', label:'Lost RFQs'},
     {id:'orders', icon:'orders', label:'Orders & POs'},
     {id:'payments', icon:'payments', label:'Payment Tracker'},
+    {id:'archived', icon:'archive', label:'Archived'},
   ];
   const otherItems = [
     {id:'customers', icon:'customers', label:'Customers'},
@@ -736,6 +748,7 @@ function renderView(){
     case 'leads': return renderLeads();
     case 'opportunities': return renderOpportunities();
     case 'lost': return renderLost();
+    case 'archived': return renderArchived();
     case 'orders': return renderOrders();
     case 'payments': return renderPayments();
     case 'customers': return renderCustomers();
@@ -949,6 +962,39 @@ function renderLost(){
   `;
 }
 
+/* ---------------- Archived ---------------- */
+function renderArchived(){
+  const q = searchQuery.toLowerCase();
+  const rows = [...state.archivedOpportunities].filter(o => !q ||
+    (o.itemProduct||'').toLowerCase().includes(q) || (o.projectName||'').toLowerCase().includes(q) ||
+    (o.poNumber||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q) ||
+    principalName(o.poPrincipalId).toLowerCase().includes(q)
+  ).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Archived</h1><div class="page-subtitle">${state.archivedOpportunities.length} archived · hidden from all lists, totals and exports. Restore brings one back.</div></div>
+  </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search archived..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Customer / Item</th><th>Type</th><th>PO #</th><th>Principal</th><th>Value</th><th>Archived</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(o=>`
+          <tr>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
+            <td>${o.pipelineStage==='order'?'Order':(o.pipelineStage==='lead'?'Lead':'RFQ')}</td>
+            <td class="mono">${esc(o.poNumber||'—')}</td>
+            <td>${esc(principalName(o.poPrincipalId)||'—')}</td>
+            <td class="num">${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
+            <td class="sub-text">${fmtDate(o.archivedAt)}</td>
+            <td><button class="btn btn-sm btn-secondary" data-action="restore-opp" data-id="${o.id}">Restore</button></td>
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="7">${searchQuery ? 'No archived records match your search.' : 'Nothing archived.'}</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
 // Orders matching the search box and the department buttons
 function orderRows(){
   const q = searchQuery.toLowerCase();
@@ -990,7 +1036,7 @@ function renderOrders(){
             <td><span class="badge ${lc.badge}">${lc.label}</span></td>
             <td><span class="badge ${sh.badge}">${sh.label}</span></td>
             <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}</td>
-            <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-opportunity" data-id="${o.id}">${icon('trash',16)}</button></td>
+            <td onclick="event.stopPropagation()" style="white-space:nowrap;"><button class="btn btn-sm btn-secondary" data-action="archive-opp" data-id="${o.id}" title="Hide from lists and totals; restore any time from Archived">Archive</button> <button class="icon-btn" data-action="delete-opportunity" data-id="${o.id}">${icon('trash',16)}</button></td>
           </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="9">No orders yet — win an RFQ to see it here.</td></tr>`}
       </tbody>
@@ -1441,6 +1487,20 @@ function attachGlobalHandlers(){
       ['Customer','Item/Product','RFQ #','Principal','Reason lost','Assigned To','Department','RFQ Date','Notes'],
       rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.rfqNumber||'', oppPrincipalNames(o), o.loseReason||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.rfqDate?fmtDate(o.rfqDate):'', o.notes||''])
     );
+  });
+  bind('archive-opp', async (el)=>{
+    const o = state.opportunities.find(x=>x.id===el.dataset.id);
+    if(!o || !confirm('Archive this record? It disappears from all lists, totals and exports, and can be restored from the Archived page.')) return;
+    const {data, error} = await sb.from('opportunities').update({archived:true, archived_at:new Date().toISOString()}).eq('id', o.id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    render(); toast('Archived');
+  });
+  bind('restore-opp', async (el)=>{
+    const {data, error} = await sb.from('opportunities').update({archived:false, archived_at:null}).eq('id', el.dataset.id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    render(); toast('Restored');
   });
   bind('reopen-rfq', async (el)=>{
     const o = state.opportunities.find(x=>x.id===el.dataset.id);
