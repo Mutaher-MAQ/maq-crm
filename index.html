@@ -301,6 +301,7 @@ const ICON_PATHS = {
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   calendar:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
   note:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  lost:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
 };
 function icon(name, size){
   size = size || 18;
@@ -696,6 +697,7 @@ function renderSidebar(){
   const pipelineItems = [
     {id:'leads', icon:'leads', label:'Leads'},
     {id:'opportunities', icon:'rfq', label:'RFQs / Opportunities'},
+    {id:'lost', icon:'lost', label:'Lost RFQs'},
     {id:'orders', icon:'orders', label:'Orders & POs'},
     {id:'payments', icon:'payments', label:'Payment Tracker'},
   ];
@@ -734,6 +736,7 @@ function renderView(){
     case 'dashboard': return renderDashboard();
     case 'leads': return renderLeads();
     case 'opportunities': return renderOpportunities();
+    case 'lost': return renderLost();
     case 'orders': return renderOrders();
     case 'payments': return renderPayments();
     case 'customers': return renderCustomers();
@@ -907,6 +910,43 @@ function renderOpportunities(){
 }
 
 /* ---------------- Orders & POs (table) ---------------- */
+/* ---------------- Lost RFQs ---------------- */
+function lostRows(){
+  const q = searchQuery.toLowerCase();
+  return state.opportunities.filter(o => o.pipelineStage==='rfq' && (o.winLose==='lost' || o.rfqStatus==='not_interested') && (
+    !q || (o.projectName||'').toLowerCase().includes(q) || (o.itemProduct||'').toLowerCase().includes(q) ||
+    (o.rfqNumber||'').toLowerCase().includes(q) || (o.loseReason||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
+  )).sort((a,b)=>b.createdAt-a.createdAt);
+}
+function oppPrincipalNames(o){ return opportunityPrincipalIds(o.id).map(principalName).join(', '); }
+function renderLost(){
+  const rows = lostRows();
+  const total = state.opportunities.filter(o=>o.pipelineStage==='rfq' && (o.winLose==='lost' || o.rfqStatus==='not_interested')).length;
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Lost RFQs</h1><div class="page-subtitle">${total} total · RFQs that did not turn into an order, with the reason</div></div>
+  </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search lost RFQs..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-lost">${icon('download',15)} Export to Excel</button></div>
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Customer / Item</th><th>RFQ #</th><th>Principal</th><th>Reason</th><th>Assigned</th><th>Department</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(o=>`
+          <tr data-action="open-opportunity" data-id="${o.id}">
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
+            <td class="mono">${esc(o.rfqNumber||'—')}</td>
+            <td>${esc(oppPrincipalNames(o)||'—')}</td>
+            <td>${o.loseReason ? esc(o.loseReason) : '<span class="sub-text">No reason recorded</span>'}</td>
+            <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}</td>
+            <td class="sub-text">${esc(o.department||'—')}</td>
+            <td onclick="event.stopPropagation()"><button class="btn btn-sm btn-secondary" data-action="reopen-rfq" data-id="${o.id}">Reopen</button></td>
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="7">${searchQuery ? 'No lost RFQs match your search.' : 'No lost RFQs. 🎉'}</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
 // Orders matching the search box and the department buttons
 function orderRows(){
   const q = searchQuery.toLowerCase();
@@ -1389,6 +1429,21 @@ function attachGlobalHandlers(){
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
 
   bind('dept-filter', (el)=>{ deptFilter = el.dataset.dept || ''; render(); });
+  bind('export-lost', ()=>{
+    const rows = lostRows();
+    exportToExcel('lost-rfqs.xlsx',
+      ['Customer','Item/Product','RFQ #','Principal','Reason lost','Assigned To','Department','RFQ Date','Notes'],
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.rfqNumber||'', oppPrincipalNames(o), o.loseReason||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.rfqDate?fmtDate(o.rfqDate):'', o.notes||''])
+    );
+  });
+  bind('reopen-rfq', async (el)=>{
+    const o = state.opportunities.find(x=>x.id===el.dataset.id);
+    if(!o || !confirm('Reopen this RFQ? It moves back to "In Progress" on the RFQ board.')) return;
+    const {data, error} = await sb.from('opportunities').update({win_lose:'pending', rfq_status:'in_progress', lose_reason:null}).eq('id', o.id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    render(); toast('RFQ reopened');
+  });
   bind('export-orders', ()=>{
     const rows = orderRows();
     exportToExcel('orders.xlsx',
