@@ -144,6 +144,7 @@
 
   .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11.5px;flex-shrink:0;}
   .name-cell{display:flex;align-items:center;gap:10px;}
+  .header-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
   .dept-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
   .dept-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;min-height:40px;border-radius:999px;border:1px solid var(--border);background:#fff;color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
   .dept-tab:hover{border-color:var(--primary);}
@@ -637,6 +638,29 @@ function exportToExcel(filename, headers, rows){
   XLSX.writeFile(wb, filename);
   toast('Exported '+rows.length+' row'+(rows.length!==1?'s':''));
 }
+// One workbook, one sheet per entry: [{name, headers, rows}]
+function exportWorkbook(filename, sheets){
+  const wb = XLSX.utils.book_new();
+  let total = 0;
+  sheets.forEach(s=>{
+    const ws = XLSX.utils.aoa_to_sheet([s.headers, ...s.rows]);
+    ws['!cols'] = s.headers.map((h,i)=>({wch: Math.min(60, Math.max(h.length, ...s.rows.slice(0,200).map(r=>String(r[i]??'').length)) + 2)}));
+    XLSX.utils.book_append_sheet(wb, ws, s.name);
+    total += s.rows.length;
+  });
+  XLSX.writeFile(wb, filename);
+  toast('Exported '+total+' rows in '+sheets.length+' sheets');
+}
+const OPP_EXPORT_HEADERS = ['Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','Created','Notes'];
+function oppExportRow(o){
+  const isOrder = o.pipelineStage==='order', isLead = o.pipelineStage==='lead';
+  const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
+  return [isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
+    (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.poDate?fmtDate(o.poDate):'',
+    (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(o.lcStatus).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder?(o.paymentStatus||''):'',
+    o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
+    o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
+}
 function toast(msg, ms=2200){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -868,7 +892,7 @@ function renderDashboard(){
   ];
 
   return `
-  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">Leads → RFQ → Order → Payment, at a glance</div></div></div>
+  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">Leads → RFQ → Order → Payment, at a glance</div></div>${(currentProfile()||{}).role==='admin' ? `<div class="header-actions"><button class="btn btn-secondary" data-action="export-backup" title="One Excel file with every record: opportunities, customers, principals, contacts, tasks, activities and team">${icon('download',15)} Download full backup</button></div>` : ''}</div>
 
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-top"><span class="stat-label">Open Leads</span><span class="stat-icon">${icon('leads',18)}</span></div><div class="stat-value">${openLeads.length}</div><div class="stat-sub">${leads.length} total</div><div class="stat-meter" title="Open vs closed leads"><i style="flex:${openLeads.length};background:var(--accent)"></i><i style="flex:${Math.max(0,leads.length-openLeads.length)};background:var(--border-strong)"></i></div></div>
@@ -950,7 +974,7 @@ function renderLeads(){
   return `
   <div class="page-header">
     <div><h1 class="page-title">Leads</h1><div class="page-subtitle">${leads.length} total · raw inquiries not yet confirmed as opportunities</div></div>
-    <button class="btn" data-action="new-lead">+ New Lead</button>
+    <div class="header-actions"><button class="btn btn-secondary" data-action="export-leads">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-lead">+ New Lead</button></div>
   </div>
   <div class="kanban">
     ${LEAD_COLUMNS.map(col=>{
@@ -977,7 +1001,7 @@ function renderOpportunities(){
   return `
   <div class="page-header">
     <div><h1 class="page-title">RFQs / Opportunities</h1><div class="page-subtitle">${rfqs.length} total · drag a card to "Won" to promote it to Orders & POs</div></div>
-    <button class="btn" data-action="new-opportunity">+ New Opportunity</button>
+    <div class="header-actions"><button class="btn btn-secondary" data-action="export-rfqs">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-opportunity">+ New Opportunity</button></div>
   </div>
   <div class="kanban">
     ${RFQ_COLUMNS.map(col=>{
@@ -1052,7 +1076,7 @@ function renderArchived(){
   <div class="page-header">
     <div><h1 class="page-title">Archived</h1><div class="page-subtitle">${state.archivedOpportunities.length} archived · hidden from all lists, totals and exports. Restore brings one back.</div></div>
   </div>
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search archived..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search archived..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-archived">${icon('download',15)} Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Customer / Item</th><th>Type</th><th>PO #</th><th>Principal</th><th>Value</th><th>Archived</th><th></th></tr></thead>
@@ -1129,6 +1153,7 @@ function renderPayments(){
   return `
   <div class="page-header">
     <div><h1 class="page-title">Payment Tracker</h1><div class="page-subtitle">${orders.length} won order${orders.length!==1?'s':''} · commission tracked per payment</div></div>
+    <div class="header-actions"><button class="btn btn-secondary" data-action="export-payments">${icon('download',15)} Export to Excel</button></div>
   </div>
   <div class="kanban">
     ${PAYMENT_COLUMNS.map(col=>{
@@ -1266,7 +1291,7 @@ function renderTasks(){
   return `
   <div class="page-header">
     <div><h1 class="page-title">Tasks</h1><div class="page-subtitle">${state.tasks.filter(t=>!t.done).length} open · ${followUps.length} follow-ups due · ${toStart.length} RFQs to work on</div></div>
-    <button class="btn" data-action="new-task">+ New Task</button>
+    <div class="header-actions"><button class="btn btn-secondary" data-action="export-tasks">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-task">+ New Task</button></div>
   </div>
   <div class="panel">
     <div class="panel-title">Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}</div>
@@ -1559,6 +1584,42 @@ function attachGlobalHandlers(){
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
 
   bind('dept-filter', (el)=>{ deptFilter = el.dataset.dept || ''; render(); });
+  bind('export-leads', ()=>{
+    const rows = state.opportunities.filter(o=>o.pipelineStage==='lead');
+    exportToExcel('leads.xlsx', ['Customer','Project','Item/Product','Source','Status','Score','Owner','Department','Notes'],
+      rows.map(o=>[customerName(o.customerId), o.projectName||'', o.itemProduct||'', (LEAD_SOURCES.find(s=>s.id===o.leadSource)||{}).label||'', (LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'', o.leadScore??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
+  });
+  bind('export-rfqs', ()=>{
+    const rows = state.opportunities.filter(o=>o.pipelineStage==='rfq').sort((a,b)=>b.createdAt-a.createdAt);
+    exportToExcel('rfqs.xlsx', ['Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
+      rows.map(o=>[customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', (RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'', (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label||'', o.winLose||'', o.loseReason||'', oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
+  });
+  bind('export-payments', ()=>{
+    const rows = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
+    exportToExcel('payments.xlsx', ['Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment','Payment Status','Commission Status','Commission Rate','Owner','Department'],
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(o.lcStatus).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
+  });
+  bind('export-tasks', ()=>{
+    exportToExcel('tasks.xlsx', ['Task','Due','Done','Related Contact','Related Record','Notes'],
+      state.tasks.map(t=>[t.title, t.dueDate?fmtDate(t.dueDate):'', t.done?'Yes':'No', t.contactId?contactName(t.contactId):'', t.opportunityId?opportunityLabel(t.opportunityId):'', t.notes||'']));
+  });
+  bind('export-archived', ()=>{
+    exportToExcel('archived.xlsx', OPP_EXPORT_HEADERS.concat(['Archived On']),
+      state.archivedOpportunities.map(o=>oppExportRow(o).concat([o.archivedAt?fmtDate(o.archivedAt):''])));
+  });
+  bind('export-backup', ()=>{
+    const day = new Date(); const stamp = `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
+    exportWorkbook(`maq-crm-backup-${stamp}.xlsx`, [
+      {name:'Opportunities', headers:OPP_EXPORT_HEADERS, rows:state.opportunities.map(oppExportRow)},
+      {name:'Archived', headers:OPP_EXPORT_HEADERS.concat(['Archived On']), rows:state.archivedOpportunities.map(o=>oppExportRow(o).concat([o.archivedAt?fmtDate(o.archivedAt):'']))},
+      {name:'Customers', headers:['Name','Industry','Website','Notes'], rows:state.customers.map(c=>[c.name,c.industry||'',c.website||'',c.notes||''])},
+      {name:'Principals', headers:['Name','Notes','Logo'], rows:state.principals.map(p=>[p.name,p.notes||'',p.logoUrl||''])},
+      {name:'Contacts', headers:['Name','Email','Phone','Title','Customer','Notes'], rows:state.contacts.map(c=>[c.name,c.email||'',c.phone||'',c.title||'',customerName(c.customerId),c.notes||''])},
+      {name:'Tasks', headers:['Task','Due','Done','Notes'], rows:state.tasks.map(t=>[t.title,t.dueDate?fmtDate(t.dueDate):'',t.done?'Yes':'No',t.notes||''])},
+      {name:'Activities', headers:['Date','Type','Note','Related Record'], rows:state.activities.map(a=>[fmtDate(a.timestamp),a.type,a.note,a.opportunityId?opportunityLabel(a.opportunityId):''])},
+      {name:'Team', headers:['Name','Email','Role','Department','Also Covers'], rows:state.profiles.map(p=>[p.fullName,p.email,p.role,p.department||'',(p.extraDepartments||[]).join(', ')])},
+    ]);
+  });
   bind('export-lost', ()=>{
     const rows = lostRows();
     exportToExcel('lost-rfqs.xlsx',
