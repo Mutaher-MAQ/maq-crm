@@ -561,6 +561,8 @@ sb.auth.onAuthStateChange((event, sess)=>{
   setTimeout(()=>{
     if(event === 'PASSWORD_RECOVERY'){ passwordRecoveryMode = true; render(); return; }
     if(!session){ passwordRecoveryMode = false; resetAppState(); render(); return; }
+    // Coming back to the tab re-announces the same signed-in user: nothing changed, so don't rebuild the page
+    if(dataLoaded && loadedUserId === session.user.id && ['TOKEN_REFRESHED','SIGNED_IN','USER_UPDATED','INITIAL_SESSION'].includes(event)) return;
     if(loadedUserId && loadedUserId !== session.user.id) resetAppState(); // switched account
     if(!bootstrapStarted && !passwordRecoveryMode) bootstrap();
     render();
@@ -617,7 +619,57 @@ function toast(msg, ms=2200){
 }
 
 /* ---------------- Render root ---------------- */
+// Keep what the user has typed in an open form (or the sign-in form) when the page is rebuilt,
+// e.g. after switching browser tabs or when a teammate's change arrives live.
+let shownDraftKey = null;
+function draftKeyNow(){
+  if(!authChecked || passwordRecoveryMode) return null;
+  if(!session) return 'login';
+  if(!dataLoaded) return null;
+  return modal ? 'm:'+modal.type+':'+(modal.id||'new')+':'+(modal.startStage||'') : null;
+}
+function draftRoot(key){ return key==='login' ? document.getElementById('login-form') : document.querySelector('.modal'); }
+function captureDraft(){
+  if(!shownDraftKey) return null;
+  const root = draftRoot(shownDraftKey);
+  if(!root) return null;
+  const vals = {};
+  root.querySelectorAll('input[name],select[name],textarea[name]').forEach(el=>{
+    if(el.type==='radio'){ if(el.checked) vals[el.name] = el.value; }
+    else vals[el.name] = el.type==='checkbox' ? el.checked : el.value;
+  });
+  const body = root.querySelector('.modal-body');
+  const a = document.activeElement;
+  return {key:shownDraftKey, vals, scroll: body ? body.scrollTop : 0,
+    focus: (a && root.contains(a) && a.name) ? {name:a.name, s:a.selectionStart, e:a.selectionEnd} : null};
+}
+function restoreDraft(d){
+  const key = draftKeyNow();
+  shownDraftKey = key;
+  if(!d || d.key !== key) return;
+  const root = draftRoot(key);
+  if(!root) return;
+  Object.keys(d.vals).forEach(n=>{
+    const els = root.querySelectorAll('[name="'+n.replace(/"/g,'\\"')+'"]');
+    els.forEach(el=>{
+      if(el.type==='radio') el.checked = (el.value === d.vals[n]);
+      else if(el.type==='checkbox') el.checked = !!d.vals[n];
+      else if(el.value !== d.vals[n]) el.value = d.vals[n];
+    });
+  });
+  const body = root.querySelector('.modal-body');
+  if(body) body.scrollTop = d.scroll || 0;
+  if(d.focus){
+    const f = root.querySelector('[name="'+d.focus.name.replace(/"/g,'\\"')+'"]');
+    if(f){ try{ f.focus({preventScroll:true}); if(d.focus.s!=null && f.setSelectionRange) f.setSelectionRange(d.focus.s, d.focus.e); }catch(e){} }
+  }
+}
 function render(){
+  const draft = captureDraft();
+  renderCore();
+  restoreDraft(draft);
+}
+function renderCore(){
   const app = document.getElementById('app');
   if(!authChecked){ app.innerHTML = `<div class="auth-wrap"><div class="sub-text">Loading…</div></div>`; return; }
   if(passwordRecoveryMode){ app.innerHTML = renderSetPassword(); attachSetPasswordHandlers(); return; }
