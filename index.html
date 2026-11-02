@@ -585,9 +585,36 @@ function currencyLines(map){
   const entries = Object.entries(map).filter(([,v])=>v);
   return entries.length ? entries.map(([c,v])=>fmtMoney(v,c)) : [fmtMoney(0)];
 }
-function fmtDate(ts){ if(!ts) return '—'; return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
-// yyyy-mm-dd in local time, for <input type="date"> (toISOString would shift it a day back east of UTC)
-function isoDay(ts){ if(!ts) return ''; const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+// All dates are shown and typed as dd/mm/yyyy, whatever the computer's regional setting is
+function fmtDate(ts){ if(!ts) return '—'; const d = new Date(ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
+// dd/mm/yyyy text for the date boxes in forms (local time, so no day shift east of UTC)
+function isoDay(ts){ return ts ? fmtDate(ts) : ''; }
+// "dd/mm/yyyy" typed by the user -> "yyyy-mm-dd" for the database; null when empty or not a real date
+function dmyToIso(s){
+  s = (s||'').trim(); if(!s) return null;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s); if(!m) return null;
+  const d = +m[1], mo = +m[2], y = +m[3];
+  const t = new Date(y, mo-1, d);
+  if(t.getFullYear()!==y || t.getMonth()!==mo-1 || t.getDate()!==d) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+// Flags any date box that is filled but not a valid dd/mm/yyyy; returns false (and shows the message) if so
+function datesValid(form){
+  let ok = true;
+  form.querySelectorAll('input[data-date]').forEach(el=>{
+    const bad = el.value.trim() !== '' && dmyToIso(el.value) === null;
+    el.setCustomValidity(bad ? 'Enter a real date as dd/mm/yyyy, for example 25/12/2026' : '');
+    if(bad && ok){ ok = false; el.reportValidity(); }
+  });
+  return ok;
+}
+// Typing 25122026 becomes 25/12/2026 as you type
+document.addEventListener('input', (e)=>{
+  const el = e.target;
+  if(!el || !el.matches || !el.matches('input[data-date]')) return;
+  const v = el.value.replace(/[^\d]/g,'').slice(0,8);
+  el.value = v.length>4 ? v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4) : (v.length>2 ? v.slice(0,2)+'/'+v.slice(2) : v);
+});
 function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function customerName(id){ const c = state.customers.find(x=>x.id===id); return c? c.name : '—'; }
 function principalName(id){ const p = state.principals.find(x=>x.id===id); return p? p.name : '—'; }
@@ -1380,7 +1407,7 @@ function renderTaskForm(){
   return modalShell(editing?'Edit Task':'New Task', `
     <form id="task-form">
       <div class="field"><label>Task *</label><input name="title" required value="${esc(t.title)}"></div>
-      <div class="field-row"><div class="field"><label>Due Date</label><input name="dueDate" type="date" value="${dueDateVal}"></div><div class="field"><label>Related Contact</label><select name="contactId">${contactOptions(t.contactId)}</select></div></div>
+      <div class="field-row"><div class="field"><label>Due Date</label><input name="dueDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${dueDateVal}"></div><div class="field"><label>Related Contact</label><select name="contactId">${contactOptions(t.contactId)}</select></div></div>
       <div class="field"><label>Related Opportunity</label><select name="opportunityId">${opportunityOptions(t.opportunityId)}</select></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(t.notes)}</textarea></div>
     </form>
@@ -1434,7 +1461,7 @@ function renderOpportunityForm(){
         <div class="field"><label>RFQ #</label><input name="rfqNumber" value="${esc(o.rfqNumber)}"></div>
         <div class="field"><label>OEM Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
       </div>
-      <div class="field"><label>RFQ Date</label><input name="rfqDate" type="date" value="${rfqDateVal}">
+      <div class="field"><label>RFQ Date</label><input name="rfqDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${rfqDateVal}">
         <div class="checkbox-row"><input type="checkbox" name="rfqDateEstimated" id="rfqDateEstimated" ${o.rfqDateEstimated?'checked':''}><label for="rfqDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
       <div class="field-row">
@@ -1442,8 +1469,8 @@ function renderOpportunityForm(){
         <div class="field"><label>Follow-Up Action</label><select name="followUpAction"><option value="">—</option>${FOLLOW_UP_ACTIONS.map(f=>`<option value="${f.id}" ${f.id===o.followUpAction?'selected':''}>${f.label}</option>`).join('')}</select></div>
       </div>
       <div class="field-row">
-        ${!isOrder ? `<div class="field"><label>Offer Due Date</label><input name="dueDate" type="date" value="${isoDay(o.dueDate)}"></div>` : ''}
-        <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="date" value="${followUpDateVal}"></div>
+        ${!isOrder ? `<div class="field"><label>Offer Due Date</label><input name="dueDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${isoDay(o.dueDate)}"></div>` : ''}
+        <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${followUpDateVal}"></div>
       </div>
       ${!isOrder ? `<div class="field-row">
         <div class="field"><label>Offer Currency</label><select name="offerCurrency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
@@ -1460,7 +1487,7 @@ function renderOpportunityForm(){
       ${isOrder ? `
       <div class="form-section-title">Purchase Order</div>
       <div class="field-row"><div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div><div class="field"><label>PO #</label><input name="poNumber" value="${esc(o.poNumber)}"></div></div>
-      <div class="field"><label>PO Date</label><input name="poDate" type="date" value="${poDateVal}">
+      <div class="field"><label>PO Date</label><input name="poDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${poDateVal}">
         <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
       <div class="field-row">
@@ -1478,7 +1505,7 @@ function renderOpportunityForm(){
 
       <div class="form-section-title">Payment / Commission</div>
       <div class="field-row">
-        <div class="field"><label>Sale Date</label><input name="saleDate" type="date" value="${saleDateVal}"></div>
+        <div class="field"><label>Sale Date</label><input name="saleDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${saleDateVal}"></div>
         <div class="field"><label>Payment Status</label><select name="paymentStatus">${PAYMENT_COLUMNS.map(s=>`<option value="${s.id}" ${s.id===o.paymentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
       </div>
       <div class="field-row">
@@ -1705,10 +1732,10 @@ function attachGlobalHandlers(){
 
   bind('save-task', async (el)=>{
     const form = document.getElementById('task-form');
-    if(!form.reportValidity()) return;
+    if(!datesValid(form) || !form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
-    const payload = {title:fd.get('title').trim(), due_date: fd.get('dueDate') || null, contact_id:fd.get('contactId')||null, opportunity_id:fd.get('opportunityId')||null, notes:fd.get('notes').trim()||null};
+    const payload = {title:fd.get('title').trim(), due_date: dmyToIso(fd.get('dueDate')), contact_id:fd.get('contactId')||null, opportunity_id:fd.get('opportunityId')||null, notes:fd.get('notes').trim()||null};
     const q = id ? sb.from('tasks').update(payload).eq('id', id) : sb.from('tasks').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
@@ -1718,7 +1745,7 @@ function attachGlobalHandlers(){
 
   bind('save-opportunity', async (el)=>{
     const form = document.getElementById('opportunity-form');
-    if(!form.reportValidity()) return;
+    if(!datesValid(form) || !form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
     const stage = el.dataset.stage;
@@ -1741,13 +1768,13 @@ function attachGlobalHandlers(){
       payload.opportunity_type = fd.get('opportunityType')||null;
       payload.opportunity_number = fd.get('opportunityNumber').trim()||null;
       payload.rfq_number = fd.get('rfqNumber').trim()||null;
-      payload.rfq_date = fd.get('rfqDate')||null;
+      payload.rfq_date = dmyToIso(fd.get('rfqDate'));
       payload.rfq_date_estimated = fd.get('rfqDateEstimated')==='on';
       payload.oem_reference_number = fd.get('oemReferenceNumber').trim()||null;
       payload.priority = fd.get('priority')||null;
       payload.follow_up_action = fd.get('followUpAction')||null;
-      payload.follow_up_date = fd.get('followUpDate')||null;
-      if(stage !== 'order') payload.due_date = fd.get('dueDate')||null;
+      payload.follow_up_date = dmyToIso(fd.get('followUpDate'));
+      if(stage !== 'order') payload.due_date = dmyToIso(fd.get('dueDate'));
       payload.contact_method = fd.get('contactMethod').trim()||null;
       payload.win_lose = fd.get('winLose');
       payload.lose_reason = fd.get('loseReason').trim()||null;
@@ -1763,7 +1790,7 @@ function attachGlobalHandlers(){
       if(fd.has('ctrNumber') && (stage === 'order' || payload.pipeline_stage === 'order')){
         payload.ctr_number = fd.get('ctrNumber').trim()||null;
         payload.po_number = fd.get('poNumber').trim()||null;
-        payload.po_date = fd.get('poDate')||null;
+        payload.po_date = dmyToIso(fd.get('poDate'));
         payload.po_date_estimated = fd.get('poDateEstimated')==='on';
         payload.currency = fd.get('currency')||null;
         payload.po_value = fd.get('poValue') ? Number(fd.get('poValue')) : null;
@@ -1771,7 +1798,7 @@ function attachGlobalHandlers(){
         payload.po_principal_id = fd.get('poPrincipalId')||null;
         payload.lc_status = fd.get('lcStatus') || 'pending';
         payload.shipment_status = fd.get('shipmentStatus') || 'pending';
-        payload.sale_date = fd.get('saleDate')||null;
+        payload.sale_date = dmyToIso(fd.get('saleDate'));
         payload.payment_status = fd.get('paymentStatus') || 'receivable';
         payload.commission_status = fd.get('commissionStatus')||null;
         payload.commission_rate = fd.get('commissionRate') ? Number(fd.get('commissionRate')) : null;
