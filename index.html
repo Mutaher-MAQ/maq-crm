@@ -537,6 +537,11 @@ async function bootstrap(){
     subscribeRealtime();
     loadedUserId = userId;
     dataLoaded = true;
+    // Once per sign-in, pop up whatever needs this person's attention today
+    try {
+      const k = 'alertsShown:'+userId;
+      if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,'1'); if(!modal && myAlerts().total) modal = {type:'alerts'}; }
+    } catch(e){}
   } catch(e){
     console.error('Failed to load CRM data', e);
     bootstrapStarted = false;
@@ -549,6 +554,7 @@ async function bootstrap(){
 }
 
 function resetAppState(){
+  try { if(loadedUserId) sessionStorage.removeItem('alertsShown:'+loadedUserId); } catch(e){}
   unsubscribeRealtime();
   dataLoaded = false; bootstrapStarted = false; loadedUserId = null;
   modal = null; view = 'dashboard'; searchQuery = ''; deptFilter = '';
@@ -892,7 +898,7 @@ function renderDashboard(){
   ];
 
   return `
-  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">Leads → RFQ → Order → Payment, at a glance</div></div>${(currentProfile()||{}).role==='admin' ? `<div class="header-actions"><button class="btn btn-secondary" data-action="export-backup" title="One Excel file with every record: opportunities, customers, principals, contacts, tasks, activities and team">${icon('download',15)} Download full backup</button></div>` : ''}</div>
+  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">Leads → RFQ → Order → Payment, at a glance</div></div><div class="header-actions">${myAlerts().total ? `<button class="btn btn-secondary" data-action="show-alerts">🔔 ${myAlerts().total} need attention</button>` : ''}${(currentProfile()||{}).role==='admin' ? `<button class="btn btn-secondary" data-action="export-backup" title="One Excel file with every record: opportunities, customers, principals, contacts, tasks, activities and team">${icon('download',15)} Download full backup</button>` : ''}</div></div>
 
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-top"><span class="stat-label">Open Leads</span><span class="stat-icon">${icon('leads',18)}</span></div><div class="stat-value">${openLeads.length}</div><div class="stat-sub">${leads.length} total</div><div class="stat-meter" title="Open vs closed leads"><i style="flex:${openLeads.length};background:var(--accent)"></i><i style="flex:${Math.max(0,leads.length-openLeads.length)};background:var(--border-strong)"></i></div></div>
@@ -966,6 +972,43 @@ function followUpsDue(){
   const rank = {overdue:0, today:1, stale:2};
   return state.opportunities.map(o=>({o, f:followUpInfo(o)})).filter(x=>x.f)
     .sort((a,b)=> rank[a.f.level]-rank[b.f.level] || b.f.days-a.f.days);
+}
+
+// What needs the signed-in person's attention today: their own overdue/today follow-ups,
+// offers falling due within 2 days, and open tasks due today or earlier.
+function myAlerts(){
+  const me = session && session.user.id;
+  const today0 = new Date().setHours(0,0,0,0);
+  const followUps = followUpsDue().filter(x=>x.o.assignedTo===me && (x.f.level==='overdue' || x.f.level==='today'));
+  const offers = state.opportunities
+    .filter(o=>o.assignedTo===me && o.pipelineStage==='rfq' && o.winLose==='pending' && ['not_started','in_progress'].includes(o.rfqStatus) && o.dueDate && Math.round((o.dueDate-today0)/DAY_MS) <= 2)
+    .sort((a,b)=>a.dueDate-b.dueDate);
+  const tasks = state.tasks.filter(t=>!t.done && t.dueDate && t.dueDate <= today0).sort((a,b)=>a.dueDate-b.dueDate);
+  return {followUps, offers, tasks, total: followUps.length + offers.length + tasks.length};
+}
+function dueWords(ts){
+  const d = Math.round((ts - new Date().setHours(0,0,0,0))/DAY_MS);
+  if(d < 0) return {text:`${-d}d overdue`, badge:'badge-red'};
+  if(d === 0) return {text:'Due today', badge:'badge-red'};
+  return {text:`Due in ${d}d`, badge:'badge-amber'};
+}
+function renderAlerts(){
+  const {followUps, offers, tasks, total} = myAlerts();
+  const oppRow = (o, badge) => `
+    <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
+      <div class="task-title">${esc(o.projectName||o.itemProduct||'RFQ')}${o.rfqNumber?` <span class="sub-text">#${esc(o.rfqNumber)}</span>`:''}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>${badge}
+    </div>`;
+  const section = (title, rows) => rows ? `<div class="panel-title" style="margin-top:14px;">${title}</div>${rows}` : '';
+  const body = total ? `
+    ${section('Follow-ups', followUps.map(({o,f})=>oppRow(o, `<span class="badge ${f.badge}">${f.label}</span>`)).join(''))}
+    ${section('Offers due', offers.map(o=>{ const w = dueWords(o.dueDate); return oppRow(o, `<span class="badge ${w.badge}">${w.text}</span>`); }).join(''))}
+    ${section('Tasks', tasks.map(t=>{ const w = dueWords(t.dueDate); return `
+      <div class="task-row" data-action="open-task" data-id="${t.id}" style="cursor:pointer">
+        <div class="task-title">${esc(t.title)}</div><span class="badge ${w.badge}">${w.text}</span>
+      </div>`; }).join(''))}`
+    : `<div class="empty-state"><div class="empty-state-icon">🎉</div>Nothing needs your attention today</div>`;
+  return modalShell(`🔔 Needs your attention${total?` (${total})`:''}`, body,
+    `<div></div><div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Close</button><button class="btn" data-nav="tasks">Open Tasks</button></div>`, true);
 }
 
 /* ---------------- Leads (Kanban) ---------------- */
@@ -1355,6 +1398,7 @@ function renderModal(){
   if(type==='contact-form') return renderContactForm();
   if(type==='opportunity-form') return renderOpportunityForm();
   if(type==='task-form') return renderTaskForm();
+  if(type==='alerts') return renderAlerts();
   return '';
 }
 
@@ -1688,6 +1732,7 @@ function attachGlobalHandlers(){
   bind('open-task', (el)=>{ modal={type:'task-form', id:el.dataset.id}; render(); });
 
   bind('close-modal', ()=>{ modal=null; render(); });
+  bind('show-alerts', ()=>{ modal={type:'alerts'}; render(); });
 
   bind('promote-lead', async (el)=>{
     const id = el.dataset.id;
