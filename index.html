@@ -633,6 +633,9 @@ function priorityBadge(id){ return ({urgent:'badge-red', high:'badge-amber', nor
 function priorityLabel(id){ const p = PRIORITIES.find(x=>x.id===id); return p? p.label : '—'; }
 function winLoseInfo(id){ return WIN_LOSE.find(x=>x.id===id) || WIN_LOSE[0]; }
 function lcStatusInfo(id){ return LC_STATUSES.find(x=>x.id===id) || LC_STATUSES[1]; }
+// Local (PKR) orders and CAD/Advance terms have no letter of credit, so a "pending" LC there means N/A
+function lcNotNeeded(currency, terms){ return currency==='PKR' || terms==='CAD' || terms==='Advance'; }
+function lcEffective(o){ return (o.lcStatus==='pending' && lcNotNeeded(o.currency, o.paymentTerms)) ? 'not_applicable' : o.lcStatus; }
 function simpleStatusInfo(id){ return SIMPLE_STATUSES.find(x=>x.id===id) || SIMPLE_STATUSES[0]; }
 function opportunityPrincipalIds(oppId){ return state.opportunityPrincipals.filter(x=>x.opportunityId===oppId).map(x=>x.principalId); }
 function esc(s){ return (s===undefined||s===null) ? '' : String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -663,7 +666,7 @@ function oppExportRow(o){
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
   return [isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
     (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.poDate?fmtDate(o.poDate):'',
-    (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(o.lcStatus).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder?(o.paymentStatus||''):'',
+    (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder?(o.paymentStatus||''):'',
     o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
     o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
 }
@@ -879,7 +882,7 @@ function renderDashboard(){
   const lost = state.opportunities.filter(o=>o.winLose==='lost');
   const wonByCurrency = sumByCurrency(won);
   const orders = state.opportunities.filter(o=>o.pipelineStage==='order');
-  const actionNeeded = orders.filter(o=>o.lcStatus==='pending' || o.shipmentStatus==='pending');
+  const actionNeeded = orders.filter(o=>lcEffective(o)==='pending' || o.shipmentStatus==='pending');
   const receivable = orders.filter(o=>o.paymentStatus!=='received');
   const receivableByCurrency = sumByCurrency(receivable);
 
@@ -921,7 +924,7 @@ function renderDashboard(){
       ${actionNeeded.length ? actionNeeded.map(o=>`
         <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
           <div class="task-title">${esc(o.projectName||o.itemProduct||'Order')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
-          ${o.lcStatus==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
+          ${lcEffective(o)==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
           ${o.shipmentStatus==='pending' ? '<span class="badge badge-amber">Shipment pending</span>' : ''}
         </div>`).join('') : `<div class="sub-text">Nothing pending — all orders are clear 🎉</div>`}
     </div>
@@ -1170,7 +1173,7 @@ function renderOrders(){
       <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(o=>{
-          const lc = lcStatusInfo(o.lcStatus); const sh = simpleStatusInfo(o.shipmentStatus);
+          const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
             <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
@@ -1560,11 +1563,11 @@ function renderOpportunityForm(){
         <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Currency</label><select name="currency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>Currency</label><select name="currency" data-action="lc-auto"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
         <div class="field"><label>PO Value</label><input name="poValue" type="number" min="0" step="0.01" value="${esc(o.poValue)}"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Payment Terms</label><select name="paymentTerms"><option value="">—</option>${PAYMENT_TERMS.map(t=>`<option value="${t}" ${t===o.paymentTerms?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Payment Terms</label><select name="paymentTerms" data-action="lc-auto"><option value="">—</option>${PAYMENT_TERMS.map(t=>`<option value="${t}" ${t===o.paymentTerms?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="field"><label>PO Principal</label><select name="poPrincipalId">${principalOptions(o.poPrincipalId)}</select></div>
       </div>
       <div class="field-row">
@@ -1641,7 +1644,7 @@ function attachGlobalHandlers(){
   bind('export-payments', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
     exportToExcel('payments.xlsx', ['Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment','Payment Status','Commission Status','Commission Rate','Owner','Department'],
-      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(o.lcStatus).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
   });
   bind('export-tasks', ()=>{
     exportToExcel('tasks.xlsx', ['Task','Due','Done','Related Contact','Related Record','Notes'],
@@ -1697,7 +1700,7 @@ function attachGlobalHandlers(){
     const rows = orderRows();
     exportToExcel('orders.xlsx',
       ['Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
-      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(o.lcStatus).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
     );
   });
   bind('export-customers', ()=>{
@@ -1732,6 +1735,12 @@ function attachGlobalHandlers(){
   bind('open-task', (el)=>{ modal={type:'task-form', id:el.dataset.id}; render(); });
 
   bind('close-modal', ()=>{ modal=null; render(); });
+  // In the order form, picking PKR or CAD/Advance sets LC Status to N/A (only while it is still Pending)
+  bind('lc-auto', (el)=>{
+    const form = el.closest('form'); if(!form) return;
+    const lc = form.elements.lcStatus; if(!lc || lc.value!=='pending') return;
+    if(lcNotNeeded(form.elements.currency.value, form.elements.paymentTerms.value)) lc.value = 'not_applicable';
+  }, 'change');
   bind('show-alerts', ()=>{ modal={type:'alerts'}; render(); });
 
   bind('promote-lead', async (el)=>{
@@ -1903,6 +1912,7 @@ function attachGlobalHandlers(){
         payload.payment_terms = fd.get('paymentTerms')||null;
         payload.po_principal_id = fd.get('poPrincipalId')||null;
         payload.lc_status = fd.get('lcStatus') || 'pending';
+        if(payload.lc_status==='pending' && lcNotNeeded(payload.currency, payload.payment_terms)) payload.lc_status = 'not_applicable';
         payload.shipment_status = fd.get('shipmentStatus') || 'pending';
         payload.sale_date = dmyToIso(fd.get('saleDate'));
         payload.payment_status = fd.get('paymentStatus') || 'receivable';
