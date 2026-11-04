@@ -414,7 +414,7 @@ let dataLoaded = false;
 let passwordRecoveryMode = false;
 
 /* ---------------- Auth & data bootstrap ---------------- */
-function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||'', department:r.department||'', extraDepartments:r.extra_departments||[], role:r.role||'employee'}; }
+function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||'', department:r.department||'', extraDepartments:r.extra_departments||[], extraPrincipals:r.extra_principals||[], role:r.role||'employee'}; }
 function currentProfile(){ return session ? state.profiles.find(p=>p.id===session.user.id) : null; }
 // Departments the signed-in user belongs to (admins cover all of them)
 function myDepartments(){
@@ -1370,7 +1370,7 @@ function renderTeam(){
   </div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Also covers</th><th>Role</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Also covers</th><th title="Sees every record involving these principals, whoever owns it">Also sees principals</th><th>Role</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p=>`
           <tr data-team-row="${p.id}">
@@ -1378,6 +1378,7 @@ function renderTeam(){
             <td class="sub-text">${esc(p.email)}</td>
             <td><select data-field="department" style="min-width:200px;"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===p.department?'selected':''}>${d}</option>`).join('')}</select></td>
             <td><div style="display:flex;flex-direction:column;gap:3px;min-width:210px;">${DEPARTMENTS.map(d=>`<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin:0;font-weight:400;"><input type="checkbox" data-extra-dept="${esc(d)}" ${(p.extraDepartments||[]).includes(d)?'checked':''} style="width:auto;margin:0;">${esc(d)}</label>`).join('')}</div></td>
+            <td><div style="display:flex;flex-direction:column;gap:3px;min-width:170px;max-height:112px;overflow-y:auto;">${[...state.principals].sort((a,b)=>a.name.localeCompare(b.name)).map(pr=>`<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin:0;font-weight:400;"><input type="checkbox" data-extra-principal="${pr.id}" ${(p.extraPrincipals||[]).includes(pr.id)?'checked':''} style="width:auto;margin:0;">${esc(pr.name)}</label>`).join('')}</div></td>
             <td><select data-field="role" style="min-width:110px;">${ROLES.map(r=>`<option value="${r.id}" ${r.id===p.role?'selected':''}>${r.label}</option>`).join('')}</select></td>
             <td onclick="event.stopPropagation()"><button class="btn btn-sm" data-action="save-team-member" data-id="${p.id}">Save</button></td>
           </tr>`).join('')}
@@ -1664,7 +1665,7 @@ function attachGlobalHandlers(){
       {name:'Contacts', headers:['Name','Email','Phone','Title','Customer','Notes'], rows:state.contacts.map(c=>[c.name,c.email||'',c.phone||'',c.title||'',customerName(c.customerId),c.notes||''])},
       {name:'Tasks', headers:['Task','Due','Done','Notes'], rows:state.tasks.map(t=>[t.title,t.dueDate?fmtDate(t.dueDate):'',t.done?'Yes':'No',t.notes||''])},
       {name:'Activities', headers:['Date','Type','Note','Related Record'], rows:state.activities.map(a=>[fmtDate(a.timestamp),a.type,a.note,a.opportunityId?opportunityLabel(a.opportunityId):''])},
-      {name:'Team', headers:['Name','Email','Role','Department','Also Covers'], rows:state.profiles.map(p=>[p.fullName,p.email,p.role,p.department||'',(p.extraDepartments||[]).join(', ')])},
+      {name:'Team', headers:['Name','Email','Role','Department','Also Covers','Also Sees Principals'], rows:state.profiles.map(p=>[p.fullName,p.email,p.role,p.department||'',(p.extraDepartments||[]).join(', '),(p.extraPrincipals||[]).map(principalName).join(', ')])},
     ]);
   });
   bind('export-lost', ()=>{
@@ -1793,7 +1794,8 @@ function attachGlobalHandlers(){
     const department = row.querySelector('[data-field="department"]').value || null;
     const role = row.querySelector('[data-field="role"]').value;
     const extra_departments = [...row.querySelectorAll('[data-extra-dept]')].filter(c=>c.checked).map(c=>c.dataset.extraDept).filter(d=>d!==department);
-    const {data, error} = await sb.from('profiles').update({department, role, extra_departments}).eq('id', id).select().single();
+    const extra_principals = [...row.querySelectorAll('[data-extra-principal]')].filter(c=>c.checked).map(c=>c.dataset.extraPrincipal);
+    const {data, error} = await sb.from('profiles').update({department, role, extra_departments, extra_principals}).eq('id', id).select().single();
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('profiles', mapProfileFromDb(data));
     render(); toast('Team member updated');
