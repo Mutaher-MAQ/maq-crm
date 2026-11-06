@@ -660,11 +660,11 @@ function exportWorkbook(filename, sheets){
   XLSX.writeFile(wb, filename);
   toast('Exported '+total+' rows in '+sheets.length+' sheets');
 }
-const OPP_EXPORT_HEADERS = ['Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','Created','Notes'];
+const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','Created','Notes'];
 function oppExportRow(o){
   const isOrder = o.pipelineStage==='order', isLead = o.pipelineStage==='lead';
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
-  return [isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
+  return [o.opportunityNumber||'', isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
     (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.poDate?fmtDate(o.poDate):'',
     (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder?(o.paymentStatus||''):'',
     o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
@@ -1061,6 +1061,7 @@ function renderOpportunities(){
             <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
               <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled')}</div>
               <div class="kanban-card-sub">${esc(customerName(o.customerId))} · RFQ# ${esc(o.rfqNumber||'—')}</div>
+              ${o.opportunityNumber ? `<div class="kanban-card-sub mono">${esc(o.opportunityNumber)}</div>` : ''}
               ${o.poValue ? `<div class="kanban-card-sub" style="font-weight:600;color:var(--primary);">${esc(fmtMoney(o.poValue, o.currency))}</div>` : ''}
               <div class="kanban-card-meta"><span class="badge ${priorityBadge(o.priority)}">${priorityLabel(o.priority)}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
               ${(f=>f?`<div class="kanban-card-meta" style="margin-top:6px;"><span class="badge ${f.badge}">⏰ ${f.label}</span></div>`:'')(followUpInfo(o))}
@@ -1147,7 +1148,7 @@ function renderArchived(){
 function orderRows(){
   const q = searchQuery.toLowerCase();
   return state.opportunities.filter(o => o.pipelineStage==='order' && (!deptFilter || o.department===deptFilter) && (
-    !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) ||
+    !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) || (o.opportunityNumber||'').toLowerCase().includes(q) ||
     (o.itemProduct||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
   )).sort((a,b)=>b.createdAt-a.createdAt);
 }
@@ -1176,7 +1177,7 @@ function renderOrders(){
           const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}</div></td>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>
             <td class="mono">${esc(o.poNumber||'—')}</td>
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
             <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
@@ -1341,9 +1342,9 @@ function renderTasks(){
   </div>
   <div class="panel">
     <div class="panel-title">Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}</div>
-    ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span style="display:flex;gap:8px;align-items:center;"><span class="sub-text">${o.followUpDate ? 'Due '+fmtDate(o.followUpDate) : 'Last contact '+fmtDate(lastTouch(o))}</span><span class="badge ${f.badge}">${f.label}</span></span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
+    ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span style="display:flex;gap:8px;align-items:center;"><span class="sub-text">${o.followUpDate ? 'Due '+fmtDate(o.followUpDate) : 'Last contact '+fmtDate(lastTouch(o))}</span><span class="badge ${f.badge}">${f.label}</span><button class="btn btn-secondary btn-sm" data-action="done-followup" data-id="${o.id}" title="Mark this follow-up done and log it">${icon('check',14)} Done</button></span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
     <div class="panel-title" style="margin-top:22px;">RFQs To Work On ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}</div>
-    ${toStart.length ? toStart.map(o=>workRow(o, `<span style="display:flex;gap:6px;align-items:center;">${dueBadge(o)}<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span></span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
+    ${toStart.length ? toStart.map(o=>workRow(o, `<span style="display:flex;gap:6px;align-items:center;">${dueBadge(o)}<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span><button class="btn btn-secondary btn-sm" data-action="advance-rfq" data-id="${o.id}" title="${o.rfqStatus==='not_started' ? 'Mark started (moves to In Progress / Awaiting OEM Offer)' : 'Mark offer sent (moves to Offer Submitted)'}">${icon('check',14)} ${o.rfqStatus==='not_started' ? 'Started' : 'Offer sent'}</button></span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
   </div>
   <div class="panel">
     <div class="panel-title">Tasks</div>
@@ -1527,7 +1528,7 @@ function renderOpportunityForm(){
       <div class="form-section-title">RFQ</div>
       <div class="field-row">
         <div class="field"><label>Opportunity Type</label><select name="opportunityType"><option value="">—</option>${OPPORTUNITY_TYPES.map(t=>`<option value="${t.id}" ${t.id===o.opportunityType?'selected':''}>${t.label}</option>`).join('')}</select></div>
-        <div class="field"><label>Opportunity Number</label><input name="opportunityNumber" value="${esc(o.opportunityNumber)}"></div>
+        <div class="field"><label>Opportunity Number</label><input value="${esc(o.opportunityNumber||'Assigned when saved')}" readonly style="background:var(--bg,#f4f6fa);color:#5d6b82;"></div>
       </div>
       <div class="field"><label>Principal (OEM)</label><select name="principalIds">${principalOptions(selectedPrincipals[0])}</select></div>
       <div class="field-row">
@@ -1639,8 +1640,8 @@ function attachGlobalHandlers(){
   });
   bind('export-rfqs', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='rfq').sort((a,b)=>b.createdAt-a.createdAt);
-    exportToExcel('rfqs.xlsx', ['Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
-      rows.map(o=>[customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', (RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'', (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label||'', o.winLose||'', o.loseReason||'', oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
+    exportToExcel('rfqs.xlsx', ['Opportunity #','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
+      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', (RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'', (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label||'', o.winLose||'', o.loseReason||'', oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
   });
   bind('export-payments', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
@@ -1700,8 +1701,8 @@ function attachGlobalHandlers(){
   bind('export-orders', ()=>{
     const rows = orderRows();
     exportToExcel('orders.xlsx',
-      ['Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
-      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
+      ['Opportunity #','Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
+      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
     );
   });
   bind('export-customers', ()=>{
@@ -1801,6 +1802,28 @@ function attachGlobalHandlers(){
     render(); toast('Team member updated');
   });
 
+  // Tasks page: tick a follow-up off. Logs it as an activity and clears the follow-up date so it leaves the list.
+  bind('done-followup', async (el)=>{
+    const o = state.opportunities.find(x=>x.id===el.dataset.id); if(!o) return;
+    const action = (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label;
+    const act = await sb.from('activities').insert({opportunity_id:o.id, type:'note', note:'Follow-up done'+(action?' ('+action+')':''), created_by:session.user.id}).select().single();
+    if(act.error){ toast('Error: '+act.error.message); return; }
+    upsertLocal('activities', mapActivityFromDb(act.data));
+    const {data, error} = await sb.from('opportunities').update({follow_up_date:null, follow_up_action:null}).eq('id', o.id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    render(); toast('Follow-up marked done');
+  });
+  // Tasks page: tick off an RFQ waiting to be worked on. Not Started -> In Progress; In Progress -> Offer Submitted.
+  bind('advance-rfq', async (el)=>{
+    const o = state.opportunities.find(x=>x.id===el.dataset.id); if(!o) return;
+    const next = o.rfqStatus==='not_started' ? 'in_progress' : 'offer_submitted';
+    const {data, error} = await sb.from('opportunities').update({rfq_status:next}).eq('id', o.id).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    render(); toast(next==='in_progress' ? 'Marked started' : 'Marked offer sent');
+  });
+
   bind('toggle-task', async (el)=>{
     const id = el.dataset.id; const done = el.checked;
     const {data, error} = await sb.from('tasks').update({done}).eq('id', id).select().single();
@@ -1883,7 +1906,6 @@ function attachGlobalHandlers(){
       if(payload.lead_status === 'qualified'){ payload.pipeline_stage = 'rfq'; payload.rfq_status = 'not_started'; }
     } else {
       payload.opportunity_type = fd.get('opportunityType')||null;
-      payload.opportunity_number = fd.get('opportunityNumber').trim()||null;
       payload.rfq_number = fd.get('rfqNumber').trim()||null;
       payload.rfq_date = dmyToIso(fd.get('rfqDate'));
       payload.rfq_date_estimated = fd.get('rfqDateEstimated')==='on';
