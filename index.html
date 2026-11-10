@@ -396,7 +396,7 @@ const PAYMENT_COLUMNS = [
   {id:'received', label:'Received', color:'#16a34a'},
 ];
 const DEPARTMENTS = ['Instrumentation & Commissioning','Transmission & Distribution','Oil & Gas','Exploration & Production','Power & Business Development'];
-const ROLES = [{id:'employee', label:'Employee'}, {id:'manager', label:'Manager'}, {id:'admin', label:'Admin'}];
+const ROLES = [{id:'employee', label:'Employee'}, {id:'manager', label:'Manager'}, {id:'director', label:'Director (view all, read-only)'}, {id:'admin', label:'Admin'}];
 
 /* ---------------- State ---------------- */
 let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
@@ -420,7 +420,7 @@ function currentProfile(){ return session ? state.profiles.find(p=>p.id===sessio
 function myDepartments(){
   const me = currentProfile();
   if(!me) return [];
-  if(me.role==='admin') return DEPARTMENTS;
+  if(me.role==='admin' || me.role==='director') return DEPARTMENTS;
   return [...new Set([me.department, ...(me.extraDepartments||[])].filter(Boolean))];
 }
 let deptFilter = '';
@@ -728,6 +728,18 @@ function render(){
   const draft = captureDraft();
   renderCore();
   restoreDraft(draft);
+  applyReadOnly();
+}
+// Directors see everything but cannot change anything (the database enforces this too).
+// Hide every write control so the screens do not offer actions that would be refused.
+function applyReadOnly(){
+  const me = currentProfile();
+  if(!me || me.role!=='director') return;
+  const app = document.getElementById('app'); if(!app) return;
+  app.querySelectorAll('[data-action^="new-"],[data-action^="save-"],[data-action^="delete-"],[data-action="archive-opp"],[data-action="restore-opp"],[data-action="reopen-rfq"],[data-action="done-followup"],[data-action="advance-rfq"],[data-action="add-opportunity-activity"]').forEach(el=>{ el.style.display='none'; });
+  app.querySelectorAll('[data-action="toggle-task"], .modal input, .modal select, .modal textarea').forEach(el=>{ el.disabled = true; });
+  app.querySelectorAll('.kanban-card[draggable]').forEach(el=>{ el.draggable = false; });
+  app.querySelectorAll('.empty-row .link').forEach(el=>{ el.style.display='none'; });
 }
 function renderCore(){
   const app = document.getElementById('app');
