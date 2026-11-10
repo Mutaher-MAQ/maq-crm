@@ -640,9 +640,9 @@ function priorityBadge(id){ return ({urgent:'badge-red', high:'badge-amber', nor
 function priorityLabel(id){ const p = PRIORITIES.find(x=>x.id===id); return p? p.label : '—'; }
 function winLoseInfo(id){ return WIN_LOSE.find(x=>x.id===id) || WIN_LOSE[0]; }
 function lcStatusInfo(id){ return LC_STATUSES.find(x=>x.id===id) || LC_STATUSES[1]; }
-// Local (PKR) orders and CAD/Advance terms have no letter of credit, so a "pending" LC there means N/A
-function lcNotNeeded(currency, terms){ return currency==='PKR' || terms==='CAD' || terms==='Advance'; }
-function lcEffective(o){ return (o.lcStatus==='pending' && lcNotNeeded(o.currency, o.paymentTerms)) ? 'not_applicable' : o.lcStatus; }
+// Payment terms decide the letter of credit: only LC orders have an LC to open (pending until opened).
+// CAD, Advance and orders with no terms yet have no LC status.
+function lcEffective(o){ return o.paymentTerms==='LC' ? (o.lcStatus==='done' ? 'done' : 'pending') : 'not_applicable'; }
 function simpleStatusInfo(id){ return SIMPLE_STATUSES.find(x=>x.id===id) || SIMPLE_STATUSES[0]; }
 function opportunityPrincipalIds(oppId){ return state.opportunityPrincipals.filter(x=>x.opportunityId===oppId).map(x=>x.principalId); }
 function esc(s){ return (s===undefined||s===null) ? '' : String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -901,7 +901,7 @@ function renderDashboard(){
   const lost = state.opportunities.filter(o=>o.winLose==='lost');
   const wonByCurrency = sumByCurrency(won);
   const orders = state.opportunities.filter(o=>o.pipelineStage==='order');
-  const actionNeeded = orders.filter(o=>lcEffective(o)==='pending' || o.shipmentStatus==='pending');
+  const actionNeeded = orders.filter(o=>!o.paymentTerms || lcEffective(o)==='pending' || o.shipmentStatus==='pending');
   const receivable = orders.filter(o=>o.paymentStatus!=='received');
   const receivableByCurrency = sumByCurrency(receivable);
 
@@ -943,6 +943,7 @@ function renderDashboard(){
       ${actionNeeded.length ? actionNeeded.map(o=>`
         <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
           <div class="task-title">${esc(o.projectName||o.itemProduct||'Order')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
+          ${!o.paymentTerms ? '<span class="badge badge-amber">Payment terms?</span>' : ''}
           ${lcEffective(o)==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
           ${o.shipmentStatus==='pending' ? '<span class="badge badge-amber">Shipment pending</span>' : ''}
         </div>`).join('') : `<div class="sub-text">Nothing pending — all orders are clear 🎉</div>`}
@@ -1190,7 +1191,7 @@ function renderOrders(){
   <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-orders">${icon('download',15)} Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>LC</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
+      <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>Payment Terms</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(o=>{
           const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
@@ -1201,7 +1202,7 @@ function renderOrders(){
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
             <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
             <td class="num">${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
-            <td><span class="badge ${lc.badge}">${lc.label}</span></td>
+            <td>${o.paymentTerms==='LC' ? `<span class="badge badge-gray">LC</span> <span class="badge ${lc.badge}">${lc.id==='done' ? 'LC opened' : 'LC pending'}</span>` : (o.paymentTerms ? `<span class="badge badge-gray">${esc(o.paymentTerms)}</span>` : `<span class="badge badge-amber">Terms?</span>`)}</td>
             <td><span class="badge ${sh.badge}">${sh.label}</span></td>
             <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}</td>
             <td onclick="event.stopPropagation()" style="white-space:nowrap;"><button class="icon-btn" data-action="archive-opp" data-id="${o.id}" title="Archive: hide from lists and totals (restore any time from the Archived page)" aria-label="Archive">${icon('archive',16)}</button><button class="icon-btn" data-action="delete-opportunity" data-id="${o.id}" title="Delete" aria-label="Delete">${icon('trash',16)}</button></td>
@@ -1584,7 +1585,7 @@ function renderOpportunityForm(){
         <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Currency</label><select name="currency" data-action="lc-auto"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>Currency</label><select name="currency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
         <div class="field"><label>PO Value</label><input name="poValue" type="number" min="0" step="0.01" value="${esc(o.poValue)}"></div>
       </div>
       <div class="field-row">
@@ -1592,7 +1593,7 @@ function renderOpportunityForm(){
         <div class="field"><label>PO Principal</label><select name="poPrincipalId">${principalOptions(o.poPrincipalId)}</select></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.lcStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+        <div class="field" id="lc-field" style="${o.paymentTerms==='LC' ? '' : 'display:none;'}"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.filter(s=>s.id!=='not_applicable').map(s=>`<option value="${s.id}" ${s.id===lcEffective({paymentTerms:'LC',lcStatus:o.lcStatus})?'selected':''}>${s.id==='done' ? 'Opened' : 'Pending'}</option>`).join('')}</select></div>
         <div class="field"><label>Shipment Status</label><select name="shipmentStatus">${SIMPLE_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.shipmentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
       </div>
 
@@ -1756,11 +1757,11 @@ function attachGlobalHandlers(){
   bind('open-task', (el)=>{ modal={type:'task-form', id:el.dataset.id}; render(); });
 
   bind('close-modal', ()=>{ modal=null; render(); });
-  // In the order form, picking PKR or CAD/Advance sets LC Status to N/A (only while it is still Pending)
+  // Order form: the LC Status field only appears when Payment Terms is LC
   bind('lc-auto', (el)=>{
     const form = el.closest('form'); if(!form) return;
-    const lc = form.elements.lcStatus; if(!lc || lc.value!=='pending') return;
-    if(lcNotNeeded(form.elements.currency.value, form.elements.paymentTerms.value)) lc.value = 'not_applicable';
+    const field = form.querySelector('#lc-field');
+    if(field) field.style.display = form.elements.paymentTerms.value==='LC' ? '' : 'none';
   }, 'change');
   bind('show-alerts', ()=>{ modal={type:'alerts'}; render(); });
 
@@ -1958,8 +1959,7 @@ function attachGlobalHandlers(){
         payload.po_value = fd.get('poValue') ? Number(fd.get('poValue')) : null;
         payload.payment_terms = fd.get('paymentTerms')||null;
         payload.po_principal_id = fd.get('poPrincipalId')||null;
-        payload.lc_status = fd.get('lcStatus') || 'pending';
-        if(payload.lc_status==='pending' && lcNotNeeded(payload.currency, payload.payment_terms)) payload.lc_status = 'not_applicable';
+        payload.lc_status = payload.payment_terms==='LC' ? (fd.get('lcStatus')==='done' ? 'done' : 'pending') : 'not_applicable';
         payload.shipment_status = fd.get('shipmentStatus') || 'pending';
         payload.sale_date = dmyToIso(fd.get('saleDate'));
         payload.payment_status = fd.get('paymentStatus') || 'receivable';
