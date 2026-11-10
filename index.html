@@ -439,7 +439,7 @@ function mapOpportunityFromDb(r){
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
     followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:(r.rfq_status==='awaiting_response' ? 'offer_submitted' : r.rfq_status)||'not_started',
     winLose:r.win_lose||'pending', loseReason:r.lose_reason||'',
-    ctrNumber:r.ctr_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
+    ctrNumber:r.ctr_number||'', jobNumber:r.job_number||'', poNumber:r.po_number||'', poDate: r.po_date ? new Date(r.po_date+'T00:00:00').getTime() : null, poDateEstimated:!!r.po_date_estimated,
     currency:r.currency||'', poValue:Number(r.po_value)||0, paymentTerms:r.payment_terms||'', poPrincipalId:r.po_principal_id||'',
     lcStatus:r.lc_status||'pending', shipmentStatus:r.shipment_status||'pending',
     saleDate: r.sale_date ? new Date(r.sale_date+'T00:00:00').getTime() : null, paymentStatus:r.payment_status||'receivable',
@@ -667,12 +667,12 @@ function exportWorkbook(filename, sheets){
   XLSX.writeFile(wb, filename);
   toast('Exported '+total+' rows in '+sheets.length+' sheets');
 }
-const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','Created','Notes'];
+const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','Created','Notes'];
 function oppExportRow(o){
   const isOrder = o.pipelineStage==='order', isLead = o.pipelineStage==='lead';
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
   return [o.opportunityNumber||'', isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
-    (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.poDate?fmtDate(o.poDate):'',
+    (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', o.poDate?fmtDate(o.poDate):'',
     (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder?(o.paymentStatus||''):'',
     o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
     o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
@@ -1168,7 +1168,7 @@ function renderArchived(){
 function orderRows(){
   const q = searchQuery.toLowerCase();
   return state.opportunities.filter(o => o.pipelineStage==='order' && (!deptFilter || o.department===deptFilter) && (
-    !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) || (o.opportunityNumber||'').toLowerCase().includes(q) ||
+    !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) || (o.jobNumber||'').toLowerCase().includes(q) || (o.opportunityNumber||'').toLowerCase().includes(q) ||
     (o.itemProduct||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
   )).sort((a,b)=>b.createdAt-a.createdAt);
 }
@@ -1197,7 +1197,7 @@ function renderOrders(){
           const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
             <td class="mono">${esc(o.poNumber||'—')}</td>
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
             <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
@@ -1581,6 +1581,7 @@ function renderOpportunityForm(){
       ${isOrder ? `
       <div class="form-section-title">Purchase Order</div>
       <div class="field-row"><div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div><div class="field"><label>PO #</label><input name="poNumber" value="${esc(o.poNumber)}"></div></div>
+      <div class="field-row"><div class="field"><label>Job Number</label><input name="jobNumber" value="${esc(o.jobNumber)}"></div><div class="field"></div></div>
       <div class="field"><label>PO Date</label><input name="poDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${poDateVal}">
         <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
@@ -1665,8 +1666,8 @@ function attachGlobalHandlers(){
   });
   bind('export-payments', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
-    exportToExcel('payments.xlsx', ['Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment','Payment Status','Commission Status','Commission Rate','Owner','Department'],
-      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
+    exportToExcel('payments.xlsx', ['Customer','Item/Product','PO #','CTR #','Job #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment','Payment Status','Commission Status','Commission Rate','Owner','Department'],
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
   });
   bind('export-tasks', ()=>{
     exportToExcel('tasks.xlsx', ['Task','Due','Done','Related Contact','Related Record','Notes'],
@@ -1721,8 +1722,8 @@ function attachGlobalHandlers(){
   bind('export-orders', ()=>{
     const rows = orderRows();
     exportToExcel('orders.xlsx',
-      ['Opportunity #','Customer','Item/Product','PO #','CTR #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
-      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
+      ['Opportunity #','Customer','Item/Product','PO #','CTR #','Job #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
+      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
     );
   });
   bind('export-customers', ()=>{
@@ -1952,6 +1953,7 @@ function attachGlobalHandlers(){
       // PO fields only exist on the order form; an RFQ just marked Won keeps its offer value and gets PO details later
       if(fd.has('ctrNumber') && (stage === 'order' || payload.pipeline_stage === 'order')){
         payload.ctr_number = fd.get('ctrNumber').trim()||null;
+        payload.job_number = (fd.get('jobNumber')||'').trim()||null;
         payload.po_number = fd.get('poNumber').trim()||null;
         payload.po_date = dmyToIso(fd.get('poDate'));
         payload.po_date_estimated = fd.get('poDateEstimated')==='on';
