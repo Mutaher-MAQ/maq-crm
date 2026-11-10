@@ -623,6 +623,13 @@ document.addEventListener('input', (e)=>{
   el.value = v.length>4 ? v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4) : (v.length>2 ? v.slice(0,2)+'/'+v.slice(2) : v);
 });
 function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
+// Name with case, punctuation, bracketed text, plurals and company suffixes removed, so
+// "Engro Fertilizer", "Engro Fertilizers Limited" and "ENGRO FERTILIZERS LTD." compare equal.
+function customerKey(name){
+  const stop = new Set(['limited','ltd','pvt','private','company','co','corporation','corp','inc','llc','the']);
+  return String(name||'').toLowerCase().replace(/\([^)]*\)/g,' ').replace(/[^a-z0-9 ]+/g,' ').split(/\s+/)
+    .filter(w=>w && !stop.has(w)).map(w=>w.length>3 ? w.replace(/s$/,'') : w).join(' ');
+}
 function customerName(id){ const c = state.customers.find(x=>x.id===id); return c? c.name : '—'; }
 function principalName(id){ const p = state.principals.find(x=>x.id===id); return p? p.name : '—'; }
 function contactName(id){ const c = state.contacts.find(x=>x.id===id); return c? c.name : '—'; }
@@ -1849,6 +1856,8 @@ function attachGlobalHandlers(){
     const fd = new FormData(form);
     const id = el.dataset.id;
     const payload = {name:fd.get('name').trim(), industry:fd.get('industry').trim()||null, website:fd.get('website').trim()||null, notes:fd.get('notes').trim()||null};
+    const twin = state.customers.find(c=>c.id!==id && customerKey(c.name)===customerKey(payload.name));
+    if(twin){ toast(`"${twin.name}" already exists. Use that customer instead of adding "${payload.name}".`, 7000); return; }
     const q = id ? sb.from('customers').update(payload).eq('id', id) : sb.from('customers').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
