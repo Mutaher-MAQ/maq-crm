@@ -2041,7 +2041,15 @@ function bind(action, handler, eventType='click', preventDefault){
     });
   });
 }
-function restoreFocus(el){ const val = el.value; el.focus(); el.setSelectionRange(val.length, val.length); }
+// render() rebuilds the page, so the box that was being typed in no longer exists:
+// focus the new search box and put the cursor back where it was.
+function restoreFocus(el){
+  const pos = el.selectionStart != null ? el.selectionStart : el.value.length;
+  const fresh = document.querySelector('[data-action="search"]');
+  if(!fresh) return;
+  fresh.focus();
+  try{ fresh.setSelectionRange(pos, pos); }catch(e){}
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
