@@ -1871,6 +1871,8 @@ function attachGlobalHandlers(){
     const fd = new FormData(form);
     const id = el.dataset.id;
     const payload = {name:fd.get('name').trim(), notes:fd.get('notes').trim()||null, logo_url:(fd.get('logoUrl')||'').trim()||null};
+    const twin = state.principals.find(p=>p.id!==id && customerKey(p.name)===customerKey(payload.name));
+    if(twin){ toast(`"${twin.name}" already exists. Use that principal instead of adding "${payload.name}".`, 7000); return; }
     const q = id ? sb.from('principals').update(payload).eq('id', id) : sb.from('principals').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
