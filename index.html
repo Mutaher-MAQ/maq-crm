@@ -852,7 +852,7 @@ function renderSidebar(){
   ];
   const me = currentProfile();
   const isAdmin = me && me.role === 'admin';
-  const navItem = i => `<div class="nav-item ${view===i.id?'active':''}" data-nav="${i.id}"><span class="nav-icon">${icon(i.icon,18)}</span> ${i.label}</div>`;
+  const navItem = i => `<div class="nav-item ${(view===i.id || (i.id==='principals' && view==='principal-detail'))?'active':''}" data-nav="${i.id}"><span class="nav-icon">${icon(i.icon,18)}</span> ${i.label}</div>`;
   const roleLine = me ? [me.role ? me.role.charAt(0).toUpperCase()+me.role.slice(1) : '', me.department].filter(Boolean).join(' · ') : '';
   const who = (me && me.fullName && me.fullName !== me.email) ? me.fullName : session.user.email;
   return `
@@ -885,6 +885,7 @@ function renderView(){
     case 'payments': return renderPayments();
     case 'customers': return renderCustomers();
     case 'principals': return renderPrincipals();
+    case 'principal-detail': return renderPrincipalDetail();
     case 'contacts': return renderContacts();
     case 'tasks': return renderTasks();
     case 'team': return renderTeam();
@@ -1294,12 +1295,64 @@ function renderPrincipals(){
           <tr data-action="open-principal" data-id="${p.id}">
             <td><div class="name-cell">${logoChip(p.name,p.logoUrl)}<div>${esc(p.name)}</div></div></td>
             <td class="sub-text">${esc(p.notes||'—')}</td><td>${oppCount}</td>
-            <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-principal" data-id="${p.id}">${icon('trash',16)}</button></td>
+            <td onclick="event.stopPropagation()" style="white-space:nowrap;"><button class="btn btn-sm btn-secondary" data-action="view-principal" data-id="${p.id}">View all</button> <button class="icon-btn" data-action="delete-principal" data-id="${p.id}">${icon('trash',16)}</button></td>
           </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="4">No principals found. <span class="link" data-action="new-principal">Add one</span></td></tr>`}
       </tbody>
     </table>
   </div>
+  `;
+}
+
+/* ---------------- Principal: everything in one place ---------------- */
+let principalDetailId = null;
+// Every record (lead, RFQ, lost RFQ, order, archived) that involves this principal
+function principalRecords(pid){
+  const involves = o => o.poPrincipalId===pid || opportunityPrincipalIds(o.id).includes(pid);
+  const live = state.opportunities.filter(involves);
+  const byNewest = (a,b)=>(b.createdAt||0)-(a.createdAt||0);
+  const isLost = o => o.pipelineStage==='rfq' && (o.winLose==='lost' || o.rfqStatus==='not_interested');
+  return {
+    leads:  live.filter(o=>o.pipelineStage==='lead').sort(byNewest),
+    rfqs:   live.filter(o=>o.pipelineStage==='rfq' && !isLost(o)).sort(byNewest),
+    lost:   live.filter(isLost).sort(byNewest),
+    orders: live.filter(o=>o.pipelineStage==='order').sort(byNewest),
+    archived: state.archivedOpportunities.filter(involves).sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0))
+  };
+}
+function renderPrincipalDetail(){
+  const p = state.principals.find(x=>x.id===principalDetailId);
+  if(!p) return `<div class="page-header"><div><h1 class="page-title">Principal not found</h1></div></div><button class="btn btn-secondary" data-nav="principals">← Back to Principals</button>`;
+  const r = principalRecords(p.id);
+  const money = o => o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—';
+  const tile = (label, n, sub) => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${n}</div>${sub?`<div class="sub-text">${sub}</div>`:''}</div>`;
+  const section = (title, list, head, rowFn, openable=true) => `
+    <h3 style="margin:22px 0 8px;">${title} <span class="sub-text">(${list.length})</span></h3>
+    <div class="panel" style="padding:0;overflow-x:auto;">
+      <table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${list.length ? list.map(o=>`<tr ${openable?`data-action="open-opportunity" data-id="${o.id}"`:''}>${rowFn(o)}</tr>`).join('') : `<tr class="empty-row"><td colspan="${head.length}">None</td></tr>`}</tbody></table>
+    </div>`;
+  const item = o => `<td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>`;
+  const owner = o => `<td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}<div class="sub-text">${esc(o.department||'')}</div></td>`;
+  return `
+  <div class="page-header">
+    <div><button class="btn btn-secondary btn-sm" data-nav="principals" style="margin-bottom:8px;">← Back to Principals</button>
+      <h1 class="page-title">${esc(p.name)}</h1>
+      <div class="page-subtitle">Every lead, RFQ and order involving this principal that you are allowed to see</div></div>
+    <button class="btn" data-action="export-principal-all" data-id="${p.id}">${icon('download',15)} Export everything to Excel</button>
+  </div>
+  <div class="stat-grid">
+    ${tile('Leads', r.leads.length)}
+    ${tile('Open RFQs', r.rfqs.length, r.rfqs.some(o=>o.poValue) ? currencyLines(sumByCurrency(r.rfqs)).join(' · ')+' offered' : '')}
+    ${tile('Lost RFQs', r.lost.length)}
+    ${tile('Orders', r.orders.length, r.orders.some(o=>o.poValue) ? currencyLines(sumByCurrency(r.orders)).join(' · ') : '')}
+    ${tile('Archived', r.archived.length)}
+  </div>
+  ${section('Orders', r.orders, ['Customer / Item','PO #','Job #','Value','Payment Terms','Payment','Assigned'], o=>`${item(o)}<td class="mono">${esc(o.poNumber||'—')}</td><td class="mono">${esc(o.jobNumber||'—')}</td><td class="num">${money(o)}</td><td>${esc(o.paymentTerms||'—')}</td><td>${esc(o.paymentStatus||'—')}</td>${owner(o)}`)}
+  ${section('Open RFQs', r.rfqs, ['Customer / Item','RFQ #','Status','Offer value','Offer due','Assigned'], o=>`${item(o)}<td class="mono">${esc(o.rfqNumber||'—')}</td><td>${esc((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'—')}</td><td class="num">${money(o)}</td><td>${o.dueDate?fmtDate(o.dueDate):'—'}</td>${owner(o)}`)}
+  ${section('Leads', r.leads, ['Customer / Item','Status','Source','Assigned'], o=>`${item(o)}<td>${esc((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'—')}</td><td>${esc(o.leadSource||'—')}</td>${owner(o)}`)}
+  ${section('Lost RFQs', r.lost, ['Customer / Item','RFQ #','Offer value','Reason','Assigned'], o=>`${item(o)}<td class="mono">${esc(o.rfqNumber||'—')}</td><td class="num">${money(o)}</td><td>${o.loseReason?esc(o.loseReason):'<span class="sub-text">No reason recorded</span>'}</td>${owner(o)}`)}
+  ${section('Archived', r.archived, ['Customer / Item','Type','PO #','Value','Archived'], o=>`${item(o)}<td>${o.pipelineStage==='order'?'Order':(o.pipelineStage==='lead'?'Lead':'RFQ')}</td><td class="mono">${esc(o.poNumber||'—')}</td><td class="num">${money(o)}</td><td class="sub-text">${fmtDate(o.archivedAt)}</td>`, false)}
   `;
 }
 
@@ -1742,6 +1795,17 @@ function attachGlobalHandlers(){
       ['Principal','Notes','Linked Opportunities'],
       rows.map(p=>[p.name, p.notes||'', state.opportunityPrincipals.filter(x=>x.principalId===p.id).length])
     );
+  });
+  bind('view-principal', (el)=>{ principalDetailId = el.dataset.id; view='principal-detail'; searchQuery=''; render(); window.scrollTo(0,0); });
+  bind('export-principal-all', (el)=>{
+    const p = state.principals.find(x=>x.id===el.dataset.id); if(!p) return;
+    const r = principalRecords(p.id);
+    const sheet = (name, list, extra) => ({name, headers: OPP_EXPORT_HEADERS.concat(extra?['Archived On']:[]), rows: list.map(o=>oppExportRow(o).concat(extra?[o.archivedAt?fmtDate(o.archivedAt):'']:[]))});
+    const all = [].concat(r.leads, r.rfqs, r.lost, r.orders);
+    const safe = p.name.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'principal';
+    exportWorkbook(`${safe}-everything.xlsx`, [
+      sheet('All', all), sheet('Leads', r.leads), sheet('Open RFQs', r.rfqs), sheet('Lost RFQs', r.lost), sheet('Orders', r.orders), sheet('Archived', r.archived, true)
+    ]);
   });
   bind('export-contacts', ()=>{
     const q = searchQuery.toLowerCase();
