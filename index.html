@@ -752,7 +752,7 @@ function applyReadOnly(){
   const me = currentProfile();
   if(!me || me.role!=='director') return;
   const app = document.getElementById('app'); if(!app) return;
-  app.querySelectorAll('[data-action^="new-"],[data-action^="save-"],[data-action^="delete-"],[data-action="archive-opp"],[data-action="restore-opp"],[data-action="reopen-rfq"],[data-action="done-followup"],[data-action="advance-rfq"],[data-action="add-opportunity-activity"]').forEach(el=>{ el.style.display='none'; });
+  app.querySelectorAll('[data-action^="new-"],[data-action^="save-"],[data-action^="delete-"],[data-action="archive-opp"],[data-action="restore-opp"],[data-action="reopen-rfq"],[data-action="done-followup"],[data-action="advance-rfq"],[data-action="add-opportunity-activity"],[data-action="add-contact-activity"],[data-action="open-merge"],[data-action="run-merge"]').forEach(el=>{ el.style.display='none'; });
   app.querySelectorAll('[data-action="toggle-task"], .modal input, .modal select, .modal textarea').forEach(el=>{ el.disabled = true; });
   app.querySelectorAll('.kanban-card[draggable]').forEach(el=>{ el.draggable = false; });
   app.querySelectorAll('.empty-row .link').forEach(el=>{ el.style.display='none'; });
@@ -1365,25 +1365,50 @@ function renderPrincipalDetail(){
 }
 
 /* ---------------- Contacts ---------------- */
-function renderContacts(){
+// Last time anyone logged a call, email, meeting or note against this contact (null = never).
+// A contact with no log yet counts from the day it was added, so a brand-new contact is not flagged.
+const CONTACT_STALE_DAYS = 90;
+let contactFilter = 'all';
+function contactContactInfo(){
+  const last = {};
+  state.activities.forEach(a=>{ if(a.contactId && (!last[a.contactId] || a.timestamp>last[a.contactId])) last[a.contactId] = a.timestamp; });
+  const now = Date.now();
+  return c => { const ts = last[c.id] || null; const days = Math.floor((now - (ts || c.createdAt || now))/86400000); return {ts, days, stale: days >= CONTACT_STALE_DAYS}; };
+}
+function contactRows(){
   const q = searchQuery.toLowerCase();
-  const rows = state.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)).sort((a,b)=>b.createdAt-a.createdAt);
+  const info = contactContactInfo();
+  let rows = state.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)).map(c=>({c, i:info(c)}));
+  if(contactFilter==='stale') rows = rows.filter(r=>r.i.stale).sort((a,b)=>b.i.days-a.i.days);
+  else rows.sort((a,b)=>b.c.createdAt-a.c.createdAt);
+  return rows;
+}
+function renderContacts(){
+  const rows = contactRows();
+  const info = contactContactInfo();
+  const staleCount = state.contacts.filter(c=>info(c).stale).length;
+  const when = i => i.ts ? `${fmtDate(i.ts)}<div class="sub-text">${i.days===0?'today':i.days+' day'+(i.days>1?'s':'')+' ago'}</div>` : `<span class="sub-text">Never logged</span>`;
   return `
   <div class="page-header">
-    <div><h1 class="page-title">Contacts</h1><div class="page-subtitle">${state.contacts.length} total</div></div>
+    <div><h1 class="page-title">Contacts</h1><div class="page-subtitle">${state.contacts.length} total · ${staleCount} not contacted in ${CONTACT_STALE_DAYS}+ days</div></div>
     <button class="btn" data-action="new-contact">+ New Contact</button>
+  </div>
+  <div class="dept-tabs">
+    <button class="dept-tab ${contactFilter==='all'?'active':''}" data-action="contact-filter" data-filter="all">All <span class="count-pill">${state.contacts.length}</span></button>
+    <button class="dept-tab ${contactFilter==='stale'?'active':''}" data-action="contact-filter" data-filter="stale">Not contacted in ${CONTACT_STALE_DAYS}+ days <span class="count-pill">${staleCount}</span></button>
   </div>
   <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search contacts..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-contacts">${icon('download',15)} Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr><th>Name</th><th>Customer</th><th>Email</th><th>Phone</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Customer</th><th>Email</th><th>Phone</th><th>Last contacted</th><th></th></tr></thead>
       <tbody>
-        ${rows.length ? rows.map(c=>`
+        ${rows.length ? rows.map(({c,i})=>`
           <tr data-action="open-contact" data-id="${c.id}">
             <td><div class="name-cell"><div class="avatar">${initials(c.name)}</div><div><div>${esc(c.name)}</div><div class="sub-text">${esc(c.title||'')}</div></div></div></td>
             <td>${esc(customerName(c.customerId))}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td>
+            <td>${when(i)}${i.stale?` <span class="badge badge-red">Overdue</span>`:''}</td>
             <td onclick="event.stopPropagation()"><button class="icon-btn" data-action="delete-contact" data-id="${c.id}">${icon('trash',16)}</button></td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="5">No contacts found. <span class="link" data-action="new-contact">Add one</span></td></tr>`}
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="6">${contactFilter==='stale' && !searchQuery ? 'Everyone has been contacted recently. 🎉' : 'No contacts found. <span class="link" data-action="new-contact">Add one</span>'}</td></tr>`}
       </tbody>
     </table>
   </div>
@@ -1486,7 +1511,54 @@ function renderModal(){
   if(type==='opportunity-form') return renderOpportunityForm();
   if(type==='task-form') return renderTaskForm();
   if(type==='alerts') return renderAlerts();
+  if(type==='merge') return renderMerge();
   return '';
+}
+
+/* ---------------- Merge duplicates (admin only) ---------------- */
+function isAdmin(){ const me = currentProfile(); return !!me && me.role==='admin'; }
+function nameSimilarity(a, b){
+  const A = new Set(customerKey(a).split(' ').filter(Boolean)), B = new Set(customerKey(b).split(' ').filter(Boolean));
+  if(!A.size || !B.size) return 0;
+  let n = 0; A.forEach(w=>{ if(B.has(w)) n++; });
+  return n / (A.size + B.size - n);
+}
+// What would move if the source were merged away: counted from the records the admin can see (admins see everything)
+function mergeImpact(kind, srcId){
+  const allOpps = state.opportunities.concat(state.archivedOpportunities);
+  if(kind==='customer') return [
+    [allOpps.filter(o=>o.customerId===srcId).length, 'opportunities, orders and archived records'],
+    [state.contacts.filter(c=>c.customerId===srcId).length, 'contacts']
+  ];
+  return [
+    [new Set(state.opportunityPrincipals.filter(x=>x.principalId===srcId).map(x=>x.opportunityId)).size, 'RFQ and lead links'],
+    [allOpps.filter(o=>o.poPrincipalId===srcId).length, 'orders (PO principal)'],
+    [state.profiles.filter(p=>(p.extraPrincipals||[]).includes(srcId)).length, 'team members who see this principal']
+  ];
+}
+function renderMerge(){
+  const kind = modal.kind, list = kind==='customer' ? state.customers : state.principals, label = kind==='customer' ? 'customer' : 'principal';
+  const src = list.find(x=>x.id===modal.id);
+  if(!src) return '';
+  const others = list.filter(x=>x.id!==src.id).map(x=>({x, s:nameSimilarity(src.name, x.name)})).sort((a,b)=>b.s-a.s || a.x.name.localeCompare(b.x.name));
+  const dst = list.find(x=>x.id===modal.targetId && x.id!==src.id) || null;
+  const impact = mergeImpact(kind, src.id);
+  return modalShell(`Merge ${label}`, `
+    <p style="margin:0 0 12px;">Move everything from <b>${esc(src.name)}</b> into another ${label}, then remove <b>${esc(src.name)}</b>.</p>
+    <div class="field"><label>Merge into (this one stays)</label>
+      <select data-action="merge-target"><option value="">Choose a ${label}…</option>
+      ${others.map(({x,s})=>`<option value="${x.id}" ${dst&&dst.id===x.id?'selected':''}>${esc(x.name)}${s>0.3?'  ← looks similar':''}</option>`).join('')}</select></div>
+    ${dst ? `
+    <div class="field"><div class="checkbox-row"><input type="checkbox" id="merge-use-name"><label for="merge-use-name" style="margin:0;">Keep the name "${esc(src.name)}" instead of "${esc(dst.name)}"</label></div></div>` : ''}
+    <div class="detail-section"><div class="detail-label">What moves${dst?` to ${esc(dst.name)}`:''}</div>
+      ${impact.map(([n,t])=>`<div class="sub-text" style="margin-bottom:4px;"><b>${n}</b> ${t}</div>`).join('')}
+    </div>
+    <p class="sub-text" style="margin:10px 0 0;">This cannot be undone. Use "Download full backup" on the Dashboard first if you want a safety copy.</p>
+  `, `
+    <div></div>
+    <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn btn-danger" data-action="run-merge" ${dst?'':'disabled'}>Merge and remove "${esc(src.name)}"</button></div>
+  `);
 }
 
 function modalShell(title, bodyHtml, footerHtml, wide){
@@ -1516,7 +1588,7 @@ function renderCustomerForm(){
       ${relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} <span class="badge ${winLoseInfo(o.winLose).badge}">${winLoseInfo(o.winLose).label}</span></div>`).join('')}</div>` : ''}
     ` : ''}
   `, `
-    <div>${editing?`<button class="btn btn-danger" data-action="delete-customer" data-id="${editing.id}">Delete</button>`:''}</div>
+    <div>${editing?`<button class="btn btn-danger" data-action="delete-customer" data-id="${editing.id}">Delete</button>`:''} ${editing && isAdmin() ? `<button class="btn btn-secondary" data-action="open-merge" data-kind="customer" data-id="${editing.id}">Merge into another…</button>` : ''}</div>
     <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-customer" data-id="${editing?editing.id:''}">Save</button></div>
   `);
 }
@@ -1535,7 +1607,7 @@ function renderPrincipalForm(){
     </form>
     ${editing && relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Linked Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} — ${esc(customerName(o.customerId))}</div>`).join('')}</div>` : ''}
   `, `
-    <div>${editing?`<button class="btn btn-danger" data-action="delete-principal" data-id="${editing.id}">Delete</button>`:''}</div>
+    <div>${editing?`<button class="btn btn-danger" data-action="delete-principal" data-id="${editing.id}">Delete</button>`:''} ${editing && isAdmin() ? `<button class="btn btn-secondary" data-action="open-merge" data-kind="principal" data-id="${editing.id}">Merge into another…</button>` : ''}</div>
     <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-principal" data-id="${editing?editing.id:''}">Save</button></div>
   `);
 }
@@ -1550,6 +1622,20 @@ function renderContactForm(){
       <div class="field-row"><div class="field"><label>Title</label><input name="title" value="${esc(c.title)}"></div><div class="field"><label>Customer</label><select name="customerId">${customerOptions(c.customerId)}</select></div></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(c.notes)}</textarea></div>
     </form>
+    ${editing ? (()=>{
+      const acts = state.activities.filter(a=>a.contactId===editing.id).sort((a,b)=>b.timestamp-a.timestamp);
+      return `
+      <div class="form-section-title">Log a Contact</div>
+      <form id="contact-activity-form" style="display:flex;gap:8px;">
+        <select name="type" style="max-width:110px"><option value="call">📞 Call</option><option value="email">✉️ Email</option><option value="meeting">🗓️ Meeting</option><option value="note">📝 Note</option></select>
+        <input name="note" placeholder="What was discussed?" required>
+        <button class="btn btn-sm" data-action="add-contact-activity" data-id="${editing.id}" type="submit">Add</button>
+      </form>
+      <div class="detail-section" style="margin-top:14px;">
+        <div class="detail-label">Contact History${acts.length ? ` · last contacted ${fmtDate(acts[0].timestamp)}` : ''}</div>
+        ${acts.length ? acts.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div><div>${esc(a.note)}</div><div class="activity-time">${activityIcon(a.type)} ${a.type} · ${fmtDate(a.timestamp)}</div></div></div>`).join('') : `<div class="sub-text">Nothing logged yet.</div>`}
+      </div>`;
+    })() : ''}
   `, `
     <div>${editing?`<button class="btn btn-danger" data-action="delete-contact" data-id="${editing.id}">Delete</button>`:''}</div>
     <div class="modal-footer-right"><button class="btn btn-secondary" data-action="close-modal">Cancel</button><button class="btn" data-action="save-contact" data-id="${editing?editing.id:''}">Save</button></div>
@@ -1841,13 +1927,84 @@ function attachGlobalHandlers(){
     ]);
   });
   bind('export-contacts', ()=>{
-    const q = searchQuery.toLowerCase();
-    const rows = state.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || customerName(c.customerId).toLowerCase().includes(q)).sort((a,b)=>b.createdAt-a.createdAt);
+    const rows = contactRows();
     exportToExcel('contacts.xlsx',
-      ['Name','Title','Customer','Email','Phone','Notes'],
-      rows.map(c=>[c.name, c.title||'', customerName(c.customerId), c.email||'', c.phone||'', c.notes||''])
+      ['Name','Title','Customer','Email','Phone','Last Contacted','Days Since Contact','Overdue','Notes'],
+      rows.map(({c,i})=>[c.name, c.title||'', customerName(c.customerId), c.email||'', c.phone||'', i.ts?fmtDate(i.ts):'Never logged', i.days, i.stale?'Yes':'', c.notes||''])
     );
   });
+  bind('contact-filter', (el)=>{ contactFilter = el.dataset.filter; render(); });
+
+  // Merge two duplicate customers or principals (admin only). Everything moves first; the duplicate is
+  // deleted only after every move has succeeded, so a failure part-way never loses a record.
+  bind('open-merge', (el)=>{ if(!isAdmin()) return; modal={type:'merge', kind:el.dataset.kind, id:el.dataset.id, targetId:''}; render(); });
+  bind('merge-target', (el)=>{ modal.targetId = el.value; render(); }, 'change');
+  bind('run-merge', async (el)=>{
+    if(!isAdmin() || !modal || modal.type!=='merge') return;
+    const kind = modal.kind, isCust = kind==='customer';
+    const list = isCust ? state.customers : state.principals;
+    const src = list.find(x=>x.id===modal.id), dst = list.find(x=>x.id===modal.targetId);
+    if(!src || !dst || src.id===dst.id) return;
+    const keepSrcName = !!(document.getElementById('merge-use-name') || {}).checked;
+    el.disabled = true; el.textContent = 'Merging…';
+    const fail = (what, error)=>{ toast(`Merge stopped at ${what}: ${error.message}. Nothing was deleted; you can run it again.`, 8000); modal=null; render(); };
+    try {
+      if(isCust){
+        const o = await sb.from('opportunities').update({customer_id:dst.id}).eq('customer_id', src.id).select();
+        if(o.error) return fail('opportunities', o.error);
+        (o.data||[]).map(mapOpportunityFromDb).forEach(x=>upsertLocal('opportunities', x));
+        const c = await sb.from('contacts').update({customer_id:dst.id}).eq('customer_id', src.id).select();
+        if(c.error) return fail('contacts', c.error);
+        (c.data||[]).map(mapContactFromDb).forEach(x=>upsertLocal('contacts', x));
+        const patch = {name: keepSrcName ? src.name : dst.name, industry: dst.industry||src.industry||null, website: dst.website||src.website||null,
+          notes: [dst.notes, src.notes && src.notes!==dst.notes ? src.notes : ''].filter(Boolean).join('\n') || null};
+        const u = await sb.from('customers').update(patch).eq('id', dst.id).select().single();
+        if(u.error) return fail('the customer record', u.error);
+        const d = await sb.from('customers').delete().eq('id', src.id);
+        if(d.error) return fail('removing the duplicate', d.error);
+        upsertLocal('customers', mapCustomerFromDb(u.data)); removeLocal('customers', src.id);
+      } else {
+        // RFQ / lead links: drop the duplicate's link where the record already has the target, move the rest
+        const srcLinks = await sb.from('opportunity_principals').select('opportunity_id').eq('principal_id', src.id);
+        if(srcLinks.error) return fail('reading links', srcLinks.error);
+        const dstLinks = await sb.from('opportunity_principals').select('opportunity_id').eq('principal_id', dst.id);
+        if(dstLinks.error) return fail('reading links', dstLinks.error);
+        const have = new Set((dstLinks.data||[]).map(r=>r.opportunity_id));
+        const dupes = (srcLinks.data||[]).map(r=>r.opportunity_id).filter(id=>have.has(id));
+        if(dupes.length){ const r = await sb.from('opportunity_principals').delete().eq('principal_id', src.id).in('opportunity_id', dupes); if(r.error) return fail('links', r.error); }
+        const mv = await sb.from('opportunity_principals').update({principal_id:dst.id}).eq('principal_id', src.id);
+        if(mv.error) return fail('links', mv.error);
+        const po = await sb.from('opportunities').update({po_principal_id:dst.id}).eq('po_principal_id', src.id).select();
+        if(po.error) return fail('orders', po.error);
+        (po.data||[]).map(mapOpportunityFromDb).forEach(x=>upsertLocal('opportunities', x));
+        for(const p of state.profiles.filter(p=>(p.extraPrincipals||[]).includes(src.id))){
+          const next = [...new Set(p.extraPrincipals.map(id=>id===src.id?dst.id:id))];
+          const r = await sb.from('profiles').update({extra_principals:next}).eq('id', p.id).select().single();
+          if(r.error) return fail('team visibility', r.error);
+          upsertLocal('profiles', mapProfileFromDb(r.data));
+        }
+        const patch = {name: keepSrcName ? src.name : dst.name, logo_url: dst.logoUrl||src.logoUrl||null,
+          notes: [dst.notes, src.notes && src.notes!==dst.notes ? src.notes : ''].filter(Boolean).join('\n') || null};
+        const u = await sb.from('principals').update(patch).eq('id', dst.id).select().single();
+        if(u.error) return fail('the principal record', u.error);
+        const d = await sb.from('principals').delete().eq('id', src.id);
+        if(d.error) return fail('removing the duplicate', d.error);
+        upsertLocal('principals', mapPrincipalFromDb(u.data)); removeLocal('principals', src.id);
+        await reloadOpportunityPrincipals();
+      }
+    } catch(err){ return fail('an unexpected error', err); }
+    modal=null; render(); toast(`Merged "${src.name}" into "${keepSrcName?src.name:dst.name}"`, 4000);
+  });
+  bind('add-contact-activity', async (el)=>{
+    const form = document.getElementById('contact-activity-form');
+    const fd = new FormData(form);
+    const note = fd.get('note').trim();
+    if(!note) return;
+    const {data, error} = await sb.from('activities').insert({contact_id:el.dataset.id, type:fd.get('type'), note, created_by:session.user.id}).select().single();
+    if(error){ toast('Error: '+error.message); return; }
+    upsertLocal('activities', mapActivityFromDb(data));
+    render(); toast('Contact logged');
+  }, 'submit', true);
 
   bind('open-customer', (el)=>{ modal={type:'customer-form', id:el.dataset.id}; render(); });
   bind('open-principal', (el)=>{ modal={type:'principal-form', id:el.dataset.id}; render(); });
