@@ -44,6 +44,45 @@
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   @media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important;}}
 
+  /* ---------- Motion: short, event-driven, never replayed on a plain redraw ---------- */
+  @keyframes fx-saved{0%{background:#d9f3e4;box-shadow:inset 3px 0 0 var(--green,#1f9d55);}100%{background:transparent;box-shadow:inset 3px 0 0 transparent;}}
+  @keyframes fx-updated{0%{background:#dcecfb;}100%{background:transparent;}}
+  @keyframes fx-settle{0%{transform:translateY(-8px) scale(.98);opacity:.6;}100%{transform:none;opacity:1;}}
+  @keyframes fx-tick{0%{transform:scale(1);}40%{transform:scale(1.35);}100%{transform:scale(1);}}
+  @keyframes fx-modal-in{0%{opacity:0;transform:scale(.96) translateY(6px);}100%{opacity:1;transform:none;}}
+  @keyframes fx-modal-out{0%{opacity:1;transform:none;}100%{opacity:0;transform:scale(.97) translateY(6px);}}
+  @keyframes fx-fade-in{0%{opacity:0;}100%{opacity:1;}}
+  @keyframes fx-fade-out{0%{opacity:1;}100%{opacity:0;}}
+  @keyframes fx-view{0%{opacity:0;transform:translateY(5px);}100%{opacity:1;transform:none;}}
+  @keyframes fx-grow{0%{transform:scaleX(0);}100%{transform:scaleX(1);}}
+  @keyframes fx-shake{0%,100%{transform:rotate(0);}20%{transform:rotate(-12deg);}40%{transform:rotate(10deg);}60%{transform:rotate(-7deg);}80%{transform:rotate(4deg);}}
+  @keyframes fx-pulse{0%{box-shadow:0 0 0 0 rgba(214,69,69,.45);}100%{box-shadow:0 0 0 9px rgba(214,69,69,0);}}
+  @keyframes fx-spin{to{transform:rotate(360deg);}}
+  .fx-saved{animation:fx-saved 1.1s ease-out both;}
+  .kanban-card.fx-saved{animation:fx-saved 1.1s ease-out both;}
+  .fx-updated{animation:fx-updated 1.3s ease-out both;}
+  .fx-settle{animation:fx-settle .26s cubic-bezier(.2,.7,.2,1) both;}
+  .fx-tick{display:inline-block;animation:fx-tick .3s ease-out both;}
+  .modal-backdrop.fx-open{animation:fx-fade-in .18s ease-out both;}
+  .modal-backdrop.fx-open .modal{animation:fx-modal-in .2s cubic-bezier(.2,.7,.2,1) both;}
+  .modal-backdrop.fx-close{animation:fx-fade-out .16s ease-in both;pointer-events:none;}
+  .modal-backdrop.fx-close .modal{animation:fx-modal-out .16s ease-in both;}
+  .main.fx-view{animation:fx-view .2s ease-out both;}
+  .stat-meter.fx-grow,.bar-fill.fx-grow{transform-origin:left center;animation:fx-grow .55s cubic-bezier(.2,.7,.2,1) both;}
+  .fx-shake{display:inline-block;animation:fx-shake .5s ease-in-out both;}
+  .badge-red.fx-pulse{animation:fx-pulse .7s ease-out both;}
+  .btn.is-busy{pointer-events:none;color:transparent !important;position:relative;}
+  .btn.is-busy > *{visibility:hidden;}
+  .btn.is-busy::after{content:"";position:absolute;left:calc(50% - 7px);top:calc(50% - 7px);width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:fx-spin .7s linear infinite;}
+  .btn-secondary.is-busy::after{border-color:rgba(20,32,51,.2);border-top-color:var(--primary);}
+  .spinner{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(20,32,51,.2);border-top-color:var(--primary);animation:fx-spin .7s linear infinite;vertical-align:middle;margin-left:6px;}
+  .collapsible-head{cursor:pointer;user-select:none;}
+  .collapsible-head .chev{margin-left:auto;display:inline-flex;color:var(--muted);transition:transform .25s;}
+  .collapsible.is-collapsed .collapsible-head .chev{transform:rotate(-90deg);}
+  .collapsible-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s cubic-bezier(.2,.7,.2,1);}
+  .collapsible.is-collapsed .collapsible-body{grid-template-rows:0fr;}
+  .collapsible-inner{overflow:hidden;min-height:0;}
+
   /* ---------- Sidebar ---------- */
   .sidebar{width:248px;background:linear-gradient(185deg,#102244 0%,#0a1630 70%);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:20px 12px 14px;flex-shrink:0;overflow-y:auto;z-index:80;}
   .brand{display:flex;align-items:center;padding:4px 10px 18px;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:8px;}
@@ -78,7 +117,8 @@
 
   .btn{background:var(--primary);color:#fff;border:1px solid var(--primary);padding:9px 16px;border-radius:var(--radius-sm);font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:0 1px 2px rgba(16,32,64,0.18);transition:background .15s,box-shadow .15s,transform .05s;}
   .btn:hover{background:var(--primary-dark);box-shadow:0 3px 10px rgba(31,56,100,0.28);}
-  .btn:active{transform:translateY(1px);}
+  .btn:active{transform:translateY(1px) scale(.98);}
+  .icon-btn:active,.dept-tab:active{transform:scale(.94);}
   .btn:disabled{opacity:.6;cursor:default;}
   .btn-secondary{background:var(--panel);color:var(--text);border:1px solid var(--border-strong);box-shadow:var(--shadow-sm);}
   .btn-secondary:hover{background:var(--panel-2);border-color:#b7c3da;box-shadow:var(--shadow-sm);}
@@ -213,8 +253,8 @@
   .empty-state{text-align:center;padding:56px 20px;color:var(--muted);}
   .empty-state-icon{font-size:34px;margin-bottom:10px;}
 
-  .toast{position:fixed;bottom:24px;right:24px;background:#0f1d36;color:#fff;padding:12px 18px;border-radius:11px;font-size:13px;font-weight:500;box-shadow:0 12px 32px rgba(8,18,42,0.3);z-index:200;opacity:0;transform:translateY(10px);transition:all .22s;pointer-events:none;border-left:3px solid var(--accent);}
-  .toast.show{opacity:1;transform:translateY(0);}
+  .toast{position:fixed;bottom:24px;right:24px;background:#0f1d36;color:#fff;padding:12px 18px;border-radius:11px;font-size:13px;font-weight:500;box-shadow:0 12px 32px rgba(8,18,42,0.3);z-index:200;opacity:0;transform:translateY(28px);transition:opacity .2s ease-in,transform .2s ease-in;pointer-events:none;border-left:3px solid var(--accent);}
+  .toast.show{opacity:1;transform:translateY(0);transition:opacity .22s ease-out,transform .28s cubic-bezier(.2,.9,.3,1.2);}
 
   /* ---------- Funnel ---------- */
   .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:13px;font-size:12.5px;}
@@ -294,6 +334,7 @@ const ICON_PATHS = {
   tasks:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>',
   team:'<circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 21a7 7 0 0 0-3-5.8"/>',
   paperclip:'<path d="M21 11l-9 9a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"/>',
+  chevron:'<path d="M6 9l6 6 6-6"/>',
   trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
@@ -508,7 +549,7 @@ async function reloadOpportunityPrincipals(){
 
 function applyRealtimeChange(collection, mapFn, payload){
   if(payload.eventType === 'DELETE'){ removeLocal(collection, payload.old.id); }
-  else { upsertLocal(collection, mapFn(payload.new)); }
+  else { upsertLocal(collection, mapFn(payload.new)); flashUpdated(payload.new && payload.new.id); }
   render();
 }
 
@@ -545,7 +586,7 @@ async function bootstrap(){
     if(!session || session.user.id !== userId) return; // user changed/signed out mid-load
     subscribeRealtime();
     loadedUserId = userId;
-    dataLoaded = true;
+    dataLoaded = true; enterView();
     // Once per sign-in, pop up whatever needs this person's attention today
     try {
       const k = 'alertsShown:'+userId;
@@ -740,11 +781,87 @@ function restoreDraft(d){
     if(f){ try{ f.focus({preventScroll:true}); if(d.focus.s!=null && f.setSelectionRange) f.setSelectionRange(d.focus.s, d.focus.e); }catch(e){} }
   }
 }
+/* ---------------- Motion effects ----------------
+   render() rebuilds the whole page, so animations are queued by the event that caused them
+   (a save, a drop, an incoming change, a page switch) and applied once to the fresh elements.
+   A plain redraw queues nothing, so nothing replays. */
+const fx = {flash:[], settle:null, viewEntered:false, savedRecently:new Map(), lastAlerts:null, lastModalKey:null};
+const collapsedSections = new Set();
+function reducedMotion(){ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function flashSaved(id){ if(!id) return; fx.flash.push({id, cls:'fx-saved'}); fx.savedRecently.set(id, Date.now()); }
+function flashUpdated(id){ if(!id) return; const t = fx.savedRecently.get(id); if(t && Date.now()-t < 6000) return; fx.flash.push({id, cls:'fx-updated'}); }
+function settleCard(id){ fx.settle = id; flashSaved(id); }
+function enterView(){ fx.viewEntered = true; }
+// Collapsible section: header toggles the body with a height animation; state survives redraws
+function collapsible(key, headHtml, bodyHtml, headClass='panel-title', headStyle=''){
+  const off = collapsedSections.has(key);
+  return `<div class="collapsible ${off?'is-collapsed':''}" data-section="${esc(key)}">
+    <div class="${headClass} collapsible-head" data-action="toggle-section" data-key="${esc(key)}" style="${headStyle}">${headHtml}<span class="chev">${icon('chevron',16)}</span></div>
+    <div class="collapsible-body"><div class="collapsible-inner">${bodyHtml}</div></div></div>`;
+}
+function countUp(el){
+  const raw = el.textContent.trim(); const n = Number(raw.replace(/,/g,'')); if(!raw || isNaN(n) || n===0) return;
+  const dec = (raw.split('.')[1]||'').length, t0 = performance.now(), dur = 520;
+  let done = false; const finish = ()=>{ if(done) return; done = true; el.textContent = raw; };
+  const step = ()=>{ if(done) return; const p = Math.max(0, Math.min(1,(performance.now()-t0)/dur)), e = 1-Math.pow(1-p,3), v = n*e;
+    el.textContent = (dec ? v.toFixed(dec) : Math.round(v)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if(p<1) requestAnimationFrame(step); else finish(); };
+  requestAnimationFrame(step);
+  setTimeout(finish, dur+120); // always land on the real figure, whatever the frame timing
+}
+function applyEffects(){
+  const app = document.getElementById('app'); if(!app) return;
+  const main = app.querySelector('.main');
+  const quiet = reducedMotion();
+  // Page switch: fade the content in; counters, meters and overdue badges play once on entry
+  if(fx.viewEntered && main){
+    fx.viewEntered = false;
+    if(!quiet){
+      main.classList.add('fx-view');
+      main.querySelectorAll('.stat-value, .cur-amt, .bar-value').forEach(countUp);
+      main.querySelectorAll('.stat-meter, .bar-fill').forEach(el=>el.classList.add('fx-grow'));
+      main.querySelectorAll('.badge-red').forEach(el=>el.classList.add('fx-pulse'));
+    }
+  }
+  // Save flash / live-update flash on the row or card that changed
+  if(fx.flash.length && main && !quiet){
+    fx.flash.forEach(({id,cls})=>main.querySelectorAll(`[data-id="${id}"]`).forEach(el=>{
+      const row = el.closest('tr, .kanban-card, .task-row, .activity-item') || el; row.classList.add(cls);
+    }));
+  }
+  fx.flash = [];
+  // Dropped kanban card slides into place and the column count ticks
+  if(fx.settle && main && !quiet){
+    const card = main.querySelector(`.kanban-card[data-id="${fx.settle}"]`);
+    if(card){ card.classList.add('fx-settle'); const pill = card.closest('.kanban-col')?.querySelector('.count-pill'); if(pill) pill.classList.add('fx-tick'); }
+  }
+  fx.settle = null;
+  // Modal: animate in only when a different modal opened, not on every redraw of the same one
+  const key = modal ? modal.type+':'+(modal.id||'new')+':'+(modal.kind||'') : null;
+  if(key && key!==fx.lastModalKey && !quiet){ const bd = app.querySelector('.modal-backdrop'); if(bd) bd.classList.add('fx-open'); }
+  fx.lastModalKey = key;
+  // Bell shakes once when the number of things needing attention goes up
+  const bell = app.querySelector('[data-action="show-alerts"]');
+  const total = (session && dataLoaded) ? myAlerts().total : null;
+  if(bell && fx.lastAlerts!=null && total>fx.lastAlerts && !quiet) bell.classList.add('fx-shake');
+  if(total!=null) fx.lastAlerts = total;
+  // Clean up after single-shot animations so a later effect can replay on the same element
+  app.querySelectorAll('.fx-saved,.fx-updated,.fx-settle,.fx-tick,.fx-view,.fx-grow,.fx-shake,.fx-pulse').forEach(el=>{
+    el.addEventListener('animationend', ()=>el.classList.remove('fx-saved','fx-updated','fx-settle','fx-tick','fx-view','fx-grow','fx-shake','fx-pulse'), {once:true});
+  });
+}
+// Buttons that talk to the server show a spinner until the call finishes
+function setBusy(el, on){ if(!el || !el.classList) return; el.classList.toggle('is-busy', !!on); el.disabled = !!on; }
+function busyWrap(fn){ return async (el, e)=>{ setBusy(el, true); try{ await fn(el, e); } finally { if(document.contains(el)) setBusy(el, false); } }; }
 function render(){
   const draft = captureDraft();
+  // A modal that is being closed fades out over the new page instead of vanishing
+  const closing = (!modal && session && dataLoaded && !reducedMotion()) ? document.querySelector('.modal-backdrop:not(.fx-close)') : null;
   renderCore();
+  if(closing){ closing.classList.add('fx-close'); document.getElementById('app').appendChild(closing); setTimeout(()=>closing.remove(), 220); }
   restoreDraft(draft);
   applyReadOnly();
+  applyEffects();
 }
 // Directors see everything but cannot change anything (the database enforces this too).
 // Hide every write control so the screens do not offer actions that would be refused.
@@ -1334,12 +1451,12 @@ function renderPrincipalDetail(){
   const r = principalRecords(p.id);
   const money = o => o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—';
   const tile = (label, n, sub) => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${n}</div>${sub?`<div class="sub-text">${sub}</div>`:''}</div>`;
-  const section = (title, list, head, rowFn, openable=true) => `
-    <h3 style="margin:22px 0 8px;">${title} <span class="sub-text">(${list.length})</span></h3>
-    <div class="panel" style="padding:0;overflow-x:auto;">
+  const section = (title, list, head, rowFn, openable=true) => collapsible('principal-'+title,
+    `<h3 style="margin:0;font-size:15px;">${title} <span class="sub-text">(${list.length})</span></h3>`,
+    `<div class="panel" style="padding:0;overflow-x:auto;">
       <table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
       <tbody>${list.length ? list.map(o=>`<tr ${openable?`data-action="open-opportunity" data-id="${o.id}"`:''}>${rowFn(o)}</tr>`).join('') : `<tr class="empty-row"><td colspan="${head.length}">None</td></tr>`}</tbody></table>
-    </div>`;
+    </div>`, 'collapsible-h3', 'display:flex;align-items:center;gap:8px;margin:22px 0 8px;');
   const item = o => `<td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>`;
   const owner = o => `<td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}<div class="sub-text">${esc(o.department||'')}</div></td>`;
   return `
@@ -1448,14 +1565,14 @@ function renderTasks(){
     <div class="header-actions"><button class="btn btn-secondary" data-action="export-tasks">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-task">+ New Task</button></div>
   </div>
   <div class="panel">
-    <div class="panel-title">Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}</div>
-    ${followUps.length ? followUps.map(({o,f})=>workRow(o, `<span style="display:flex;gap:8px;align-items:center;"><span class="sub-text">${o.followUpDate ? 'Due '+fmtDate(o.followUpDate) : 'Last contact '+fmtDate(lastTouch(o))}</span><span class="badge ${f.badge}">${f.label}</span><button class="btn btn-secondary btn-sm" data-action="done-followup" data-id="${o.id}" title="Mark this follow-up done and log it">${icon('check',14)} Done</button></span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`}
-    <div class="panel-title" style="margin-top:22px;">RFQs To Work On ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}</div>
-    ${toStart.length ? toStart.map(o=>workRow(o, `<span style="display:flex;gap:6px;align-items:center;">${dueBadge(o)}<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span><button class="btn btn-secondary btn-sm" data-action="advance-rfq" data-id="${o.id}" title="${o.rfqStatus==='not_started' ? 'Mark started (moves to In Progress / Awaiting OEM Offer)' : 'Mark offer sent (moves to Offer Submitted)'}">${icon('check',14)} ${o.rfqStatus==='not_started' ? 'Started' : 'Offer sent'}</button></span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`}
+    ${collapsible('tasks-followups', `Follow-Ups Due ${followUps.length?`<span class="badge badge-red">${followUps.length}</span>`:''}`,
+      followUps.length ? followUps.map(({o,f})=>workRow(o, `<span style="display:flex;gap:8px;align-items:center;"><span class="sub-text">${o.followUpDate ? 'Due '+fmtDate(o.followUpDate) : 'Last contact '+fmtDate(lastTouch(o))}</span><span class="badge ${f.badge}">${f.label}</span><button class="btn btn-secondary btn-sm" data-action="done-followup" data-id="${o.id}" title="Mark this follow-up done and log it">${icon('check',14)} Done</button></span>`)).join('') : `<div class="sub-text">No follow-ups due 🎉</div>`)}
+    ${collapsible('tasks-rfqs', `RFQs To Work On ${toStart.length?`<span class="badge badge-amber">${toStart.length}</span>`:''}`,
+      toStart.length ? toStart.map(o=>workRow(o, `<span style="display:flex;gap:6px;align-items:center;">${dueBadge(o)}<span class="badge ${priorityBadge(o.priority)}">${esc(PRIORITIES.find(p=>p.id===o.priority)?.label||'Normal')}</span><button class="btn btn-secondary btn-sm" data-action="advance-rfq" data-id="${o.id}" title="${o.rfqStatus==='not_started' ? 'Mark started (moves to In Progress / Awaiting OEM Offer)' : 'Mark offer sent (moves to Offer Submitted)'}">${icon('check',14)} ${o.rfqStatus==='not_started' ? 'Started' : 'Offer sent'}</button></span>`)).join('') : `<div class="sub-text">No new RFQs waiting</div>`,
+      'panel-title', 'margin-top:22px;')}
   </div>
   <div class="panel">
-    <div class="panel-title">Tasks</div>
-    ${sorted.length ? sorted.map(t=>`
+    ${collapsible('tasks-list', 'Tasks', sorted.length ? sorted.map(t=>`
       <div class="task-row ${t.done?'done':''}">
         <input type="checkbox" data-action="toggle-task" data-id="${t.id}" ${t.done?'checked':''}>
         <div class="task-title" data-action="open-task" data-id="${t.id}" style="cursor:pointer">
@@ -1464,7 +1581,7 @@ function renderTasks(){
         </div>
         <span class="badge ${!t.done && t.dueDate && t.dueDate<Date.now() ? 'badge-red':'badge-gray'}">${fmtDate(t.dueDate)}</span>
         <button class="icon-btn" data-action="delete-task" data-id="${t.id}">${icon('trash',16)}</button>
-      </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">✅</div>No tasks yet</div>`}
+      </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">✅</div>No tasks yet</div>`)}
   </div>
   `;
 }
@@ -1810,7 +1927,13 @@ function renderOpportunityForm(){
 function attachGlobalHandlers(){
   const app = document.getElementById('app');
 
-  app.querySelectorAll('[data-nav]').forEach(el=>{ el.addEventListener('click', ()=>{ view = el.dataset.nav; searchQuery=''; modal=null; navOpen=false; render(); window.scrollTo(0,0); }); });
+  app.querySelectorAll('[data-nav]').forEach(el=>{ el.addEventListener('click', ()=>{ view = el.dataset.nav; searchQuery=''; modal=null; navOpen=false; enterView(); render(); window.scrollTo(0,0); }); });
+  // Collapsible sections animate open/closed in place; the set remembers the choice across redraws
+  bind('toggle-section', (el)=>{
+    const box = el.closest('.collapsible'); if(!box) return;
+    const off = box.classList.toggle('is-collapsed');
+    if(off) collapsedSections.add(el.dataset.key); else collapsedSections.delete(el.dataset.key);
+  });
   bind('toggle-nav', ()=>{ navOpen = !navOpen; render(); });
   bind('close-nav', ()=>{ navOpen = false; render(); });
   app.querySelectorAll('[data-action="search"]').forEach(el=>{ el.addEventListener('input', ()=>{ searchQuery = el.value; render(); restoreFocus(el); }); });
@@ -1915,7 +2038,7 @@ function attachGlobalHandlers(){
       rows.map(p=>[p.name, p.notes||'', state.opportunityPrincipals.filter(x=>x.principalId===p.id).length])
     );
   });
-  bind('view-principal', (el)=>{ principalDetailId = el.dataset.id; view='principal-detail'; searchQuery=''; render(); window.scrollTo(0,0); });
+  bind('view-principal', (el)=>{ principalDetailId = el.dataset.id; view='principal-detail'; searchQuery=''; enterView(); render(); window.scrollTo(0,0); });
   bind('export-principal-all', (el)=>{
     const p = state.principals.find(x=>x.id===el.dataset.id); if(!p) return;
     const r = principalRecords(p.id);
@@ -2069,6 +2192,7 @@ function attachGlobalHandlers(){
       if(file.size > MAX_FILE_BYTES){ toast(`${file.name} is over 10 MB and was skipped`, 4000); continue; }
       const safe = file.name.replace(/[^A-Za-z0-9._-]+/g,'_').slice(-120) || 'file';
       const path = `${oppId}/${crypto.randomUUID()}-${safe}`;
+      if(!el.disabled){ el.disabled = true; const sp = document.createElement('span'); sp.className='spinner'; sp.title='Uploading…'; el.after(sp); }
       toast('Uploading '+file.name+'…', 6000);
       const up = await sb.storage.from(FILE_BUCKET).upload(path, file, {contentType: file.type || 'application/octet-stream'});
       if(up.error){ toast('Upload failed: '+up.error.message, 5000); continue; }
@@ -2098,7 +2222,7 @@ function attachGlobalHandlers(){
     removeLocal('tasks', id); modal=null; render(); toast('Task deleted');
   });
 
-  bind('save-team-member', async (el)=>{
+  bind('save-team-member', busyWrap(async (el)=>{
     const id = el.dataset.id;
     const row = document.querySelector(`[data-team-row="${id}"]`);
     const department = row.querySelector('[data-field="department"]').value || null;
@@ -2109,7 +2233,8 @@ function attachGlobalHandlers(){
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('profiles', mapProfileFromDb(data));
     render(); toast('Team member updated');
-  });
+    const saved = document.querySelector(`[data-team-row="${id}"]`); if(saved && !reducedMotion()) saved.classList.add('fx-saved');
+  }));
 
   // Tasks page: tick a follow-up off. Logs it as an activity and clears the follow-up date so it leaves the list.
   bind('done-followup', async (el)=>{
@@ -2120,7 +2245,7 @@ function attachGlobalHandlers(){
     upsertLocal('activities', mapActivityFromDb(act.data));
     const {data, error} = await sb.from('opportunities').update({follow_up_date:null, follow_up_action:null}).eq('id', o.id).select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    upsertLocal('opportunities', mapOpportunityFromDb(data)); flashSaved(o.id);
     render(); toast('Follow-up marked done');
   });
   // Tasks page: tick off an RFQ waiting to be worked on. Not Started -> In Progress; In Progress -> Offer Submitted.
@@ -2129,7 +2254,7 @@ function attachGlobalHandlers(){
     const next = o.rfqStatus==='not_started' ? 'in_progress' : 'offer_submitted';
     const {data, error} = await sb.from('opportunities').update({rfq_status:next}).eq('id', o.id).select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('opportunities', mapOpportunityFromDb(data));
+    upsertLocal('opportunities', mapOpportunityFromDb(data)); flashSaved(o.id);
     render(); toast(next==='in_progress' ? 'Marked started' : 'Marked offer sent');
   });
 
@@ -2137,10 +2262,10 @@ function attachGlobalHandlers(){
     const id = el.dataset.id; const done = el.checked;
     const {data, error} = await sb.from('tasks').update({done}).eq('id', id).select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('tasks', mapTaskFromDb(data)); render();
+    upsertLocal('tasks', mapTaskFromDb(data)); flashSaved(id); render();
   }, 'change');
 
-  bind('save-customer', async (el)=>{
+  bind('save-customer', busyWrap(async (el)=>{
     const form = document.getElementById('customer-form');
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
@@ -2151,11 +2276,11 @@ function attachGlobalHandlers(){
     const q = id ? sb.from('customers').update(payload).eq('id', id) : sb.from('customers').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('customers', mapCustomerFromDb(data));
+    upsertLocal('customers', mapCustomerFromDb(data)); flashSaved(data.id);
     modal=null; render(); toast('Customer saved');
-  });
+  }));
 
-  bind('save-principal', async (el)=>{
+  bind('save-principal', busyWrap(async (el)=>{
     const form = document.getElementById('principal-form');
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
@@ -2166,11 +2291,11 @@ function attachGlobalHandlers(){
     const q = id ? sb.from('principals').update(payload).eq('id', id) : sb.from('principals').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('principals', mapPrincipalFromDb(data));
+    upsertLocal('principals', mapPrincipalFromDb(data)); flashSaved(data.id);
     modal=null; render(); toast('Principal saved');
-  });
+  }));
 
-  bind('save-contact', async (el)=>{
+  bind('save-contact', busyWrap(async (el)=>{
     const form = document.getElementById('contact-form');
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
@@ -2179,11 +2304,11 @@ function attachGlobalHandlers(){
     const q = id ? sb.from('contacts').update(payload).eq('id', id) : sb.from('contacts').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('contacts', mapContactFromDb(data));
+    upsertLocal('contacts', mapContactFromDb(data)); flashSaved(data.id);
     modal=null; render(); toast('Contact saved');
-  });
+  }));
 
-  bind('save-task', async (el)=>{
+  bind('save-task', busyWrap(async (el)=>{
     const form = document.getElementById('task-form');
     if(!datesValid(form) || !form.reportValidity()) return;
     const fd = new FormData(form);
@@ -2192,11 +2317,11 @@ function attachGlobalHandlers(){
     const q = id ? sb.from('tasks').update(payload).eq('id', id) : sb.from('tasks').insert(payload);
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
-    upsertLocal('tasks', mapTaskFromDb(data));
+    upsertLocal('tasks', mapTaskFromDb(data)); flashSaved(data.id);
     modal=null; render(); toast('Task saved');
-  });
+  }));
 
-  bind('save-opportunity', async (el)=>{
+  bind('save-opportunity', busyWrap(async (el)=>{
     const form = document.getElementById('opportunity-form');
     if(!datesValid(form) || !form.reportValidity()) return;
     const fd = new FormData(form);
@@ -2261,7 +2386,7 @@ function attachGlobalHandlers(){
     const {data, error} = await q.select().single();
     if(error){ toast('Error: '+error.message); return; }
     const savedOpp = mapOpportunityFromDb(data);
-    upsertLocal('opportunities', savedOpp);
+    upsertLocal('opportunities', savedOpp); flashSaved(savedOpp.id);
 
     if(form.principalIds){
       const principalIds = Array.from(form.principalIds.selectedOptions).map(o=>o.value).filter(Boolean);
@@ -2271,7 +2396,7 @@ function attachGlobalHandlers(){
     }
 
     modal=null; render(); toast(payload.pipeline_stage==='order' && stage!=='order' ? 'Won! Moved to Orders & POs' : (payload.pipeline_stage==='rfq' && stage==='lead' ? 'Qualified! Moved to RFQs' : 'Saved'));
-  });
+  }));
 
   bind('add-opportunity-activity', async (el)=>{
     const form = document.getElementById('activity-form');
@@ -2312,6 +2437,7 @@ function attachGlobalHandlers(){
       else if(board==='payment' && opp.paymentStatus!==colId){ payload = {payment_status:colId}; }
       if(!payload) return;
       Object.assign(opp, board==='leads'?{leadStatus:colId}:(board==='rfq'?{rfqStatus:colId}:{paymentStatus:colId}));
+      settleCard(dragCardId);
       render();
       const {data, error} = await sb.from('opportunities').update(payload).eq('id', dragCardId).select().single();
       if(error){ toast('Error: '+error.message); return; }
