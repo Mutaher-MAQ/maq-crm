@@ -293,6 +293,7 @@ const ICON_PATHS = {
   contacts:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   tasks:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>',
   team:'<circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 21a7 7 0 0 0-3-5.8"/>',
+  paperclip:'<path d="M21 11l-9 9a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"/>',
   trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
@@ -400,7 +401,11 @@ const DEPARTMENTS = ['Instrumentation & Commissioning','Transmission & Distribut
 const ROLES = [{id:'employee', label:'Employee'}, {id:'manager', label:'Manager'}, {id:'director', label:'Director (view all, read-only)'}, {id:'admin', label:'Admin'}];
 
 /* ---------------- State ---------------- */
-let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
+let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[], files:[]};
+const FILE_BUCKET = 'po-files', MAX_FILE_BYTES = 10*1024*1024;
+function mapFileFromDb(r){ return {id:r.id, opportunityId:r.opportunity_id, name:r.file_name, path:r.storage_path, size:Number(r.size_bytes)||0, type:r.content_type||'', uploadedBy:r.uploaded_by||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
+function fmtSize(b){ return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
+function filesFor(oppId){ return state.files.filter(f=>f.opportunityId===oppId).sort((a,b)=>b.createdAt-a.createdAt); }
 let view = 'dashboard';
 let navOpen = false;
 let searchQuery = '';
@@ -468,7 +473,7 @@ function removeLocal(collection, id){
 
 let loadWarning = '';
 async function loadAllData(){
-  const [pf, cu, pr, ct, op, opr, ta, ac] = await Promise.all([
+  const [pf, cu, pr, ct, op, opr, ta, ac, fl] = await Promise.all([
     sb.from('profiles').select('*'),
     sb.from('customers').select('*').order('name'),
     sb.from('principals').select('*').order('name'),
@@ -477,6 +482,7 @@ async function loadAllData(){
     sb.from('opportunity_principals').select('*'),
     sb.from('tasks').select('*'),
     sb.from('activities').select('*'),
+    sb.from('opportunity_files').select('*'),
   ]);
   // Surface failed loads instead of silently showing an empty list
   const failed = [['profiles',pf],['customers',cu],['principals',pr],['contacts',ct],['opportunities',op],['tasks',ta],['activities',ac]].filter(([,r])=>r.error);
@@ -492,6 +498,7 @@ async function loadAllData(){
   state.opportunityPrincipals = (opr.data||[]).map(r=>({opportunityId:r.opportunity_id, principalId:r.principal_id}));
   state.tasks = (ta.data||[]).map(mapTaskFromDb);
   state.activities = (ac.data||[]).map(mapActivityFromDb);
+  state.files = (fl.data||[]).map(mapFileFromDb); // empty (not an error) until migration_attachments.sql has been run
 }
 
 async function reloadOpportunityPrincipals(){
@@ -522,6 +529,7 @@ function subscribeRealtime(){
     .on('postgres_changes', {event:'*', schema:'public', table:'opportunity_principals'}, async ()=>{ await reloadOpportunityPrincipals(); render(); })
     .on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, p=>applyRealtimeChange('tasks', mapTaskFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, p=>applyRealtimeChange('activities', mapActivityFromDb, p))
+    .on('postgres_changes', {event:'*', schema:'public', table:'opportunity_files'}, p=>applyRealtimeChange('files', mapFileFromDb, p))
     .subscribe();
 }
 
@@ -559,7 +567,7 @@ function resetAppState(){
   unsubscribeRealtime();
   dataLoaded = false; bootstrapStarted = false; loadedUserId = null;
   modal = null; view = 'dashboard'; searchQuery = ''; deptFilter = '';
-  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[]};
+  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[],files:[]};
 }
 
 // Never await Supabase calls inside onAuthStateChange (it deadlocks the auth lock) — defer with setTimeout.
@@ -1199,7 +1207,7 @@ function renderOrders(){
           const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}${filesFor(o.id).length?' · '+icon('paperclip',12)+' '+filesFor(o.id).length:''}</div></td>
             <td class="mono">${esc(o.poNumber||'—')}</td>
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
             <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
@@ -1565,6 +1573,29 @@ function renderTaskForm(){
   `);
 }
 
+// Files attached to a record (PO copy, RFQ from the customer, drawings...). Stored privately, opened with a short-lived link.
+function renderAttachments(editing, isOrder){
+  const title = isOrder ? 'PO Documents &amp; Attachments' : 'Attachments';
+  if(!editing) return `<div class="form-section-title">${title}</div><div class="sub-text">Save first, then you can attach files${isOrder?' such as the customer PO':''}.</div>`;
+  const list = filesFor(editing.id);
+  const me = currentProfile();
+  const canEdit = !(me && me.role==='director');
+  return `
+  <div class="form-section-title">${title}</div>
+  ${canEdit ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <input type="file" id="attach-input" multiple data-action="attach-files" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.msg,.eml,.zip,.txt" style="max-width:100%;">
+    <span class="sub-text">PDF, images, Word, Excel, email or zip · up to 10 MB each</span>
+  </div>` : ''}
+  <div class="detail-section" style="margin-top:10px;">
+    ${list.length ? list.map(f=>`
+      <div class="activity-item" style="align-items:center;">
+        <div style="flex:1;min-width:0;"><div style="overflow-wrap:anywhere;">${esc(f.name)}</div><div class="activity-time">${fmtSize(f.size)} · ${fmtDate(f.createdAt)}${f.uploadedBy?' · '+esc(profileName(f.uploadedBy)):''}</div></div>
+        <button type="button" class="btn btn-sm btn-secondary" data-action="download-file" data-id="${f.id}">Open</button>
+        <button type="button" class="icon-btn" data-action="delete-file" data-id="${f.id}" title="Remove file">${icon('trash',16)}</button>
+      </div>`).join('') : `<div class="sub-text">No files attached yet.</div>`}
+  </div>`;
+}
+
 function renderOpportunityForm(){
   const editing = modal.id ? state.opportunities.find(o=>o.id===modal.id) : null;
   const startStage = modal.startStage || (editing ? editing.pipelineStage : 'rfq');
@@ -1666,6 +1697,7 @@ function renderOpportunityForm(){
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(o.notes)}</textarea></div>
     </form>
 
+    ${renderAttachments(editing, isOrder)}
     ${editing ? `
     <div class="form-section-title">Log an Activity</div>
     <form id="activity-form" style="display:flex;gap:8px;">
@@ -1741,6 +1773,7 @@ function attachGlobalHandlers(){
       {name:'Contacts', headers:['Name','Email','Phone','Title','Customer','Notes'], rows:state.contacts.map(c=>[c.name,c.email||'',c.phone||'',c.title||'',customerName(c.customerId),c.notes||''])},
       {name:'Tasks', headers:['Task','Due','Done','Notes'], rows:state.tasks.map(t=>[t.title,t.dueDate?fmtDate(t.dueDate):'',t.done?'Yes':'No',t.notes||''])},
       {name:'Activities', headers:['Date','Type','Note','Related Record'], rows:state.activities.map(a=>[fmtDate(a.timestamp),a.type,a.note,a.opportunityId?opportunityLabel(a.opportunityId):''])},
+      {name:'Attachments', headers:['Record','File','Size (KB)','Uploaded','By'], rows:state.files.map(f=>[opportunityLabel(f.opportunityId), f.name, Math.round(f.size/1024), fmtDate(f.createdAt), f.uploadedBy?profileName(f.uploadedBy):''])},
       {name:'Team', headers:['Name','Email','Role','Department','Also Covers','Also Sees Principals'], rows:state.profiles.map(p=>[p.fullName,p.email,p.role,p.department||'',(p.extraDepartments||[]).join(', '),(p.extraPrincipals||[]).map(principalName).join(', ')])},
     ]);
   });
@@ -1864,9 +1897,42 @@ function attachGlobalHandlers(){
   bind('delete-opportunity', async (el)=>{
     if(!confirm('Delete this record?')) return;
     const id = el.dataset.id;
+    const paths = filesFor(id).map(f=>f.path);
     const {error} = await sb.from('opportunities').delete().eq('id', id);
     if(error){ toast('Error: '+error.message); return; }
+    if(paths.length) await sb.storage.from(FILE_BUCKET).remove(paths); // do not leave orphaned files behind
+    state.files = state.files.filter(f=>f.opportunityId!==id);
     removeLocal('opportunities', id); modal=null; render(); toast('Deleted');
+  });
+  bind('attach-files', async (el)=>{
+    const oppId = modal && modal.id; if(!oppId) return;
+    const picked = Array.from(el.files||[]); if(!picked.length) return;
+    let ok = 0;
+    for(const file of picked){
+      if(file.size > MAX_FILE_BYTES){ toast(`${file.name} is over 10 MB and was skipped`, 4000); continue; }
+      const safe = file.name.replace(/[^A-Za-z0-9._-]+/g,'_').slice(-120) || 'file';
+      const path = `${oppId}/${crypto.randomUUID()}-${safe}`;
+      toast('Uploading '+file.name+'…', 6000);
+      const up = await sb.storage.from(FILE_BUCKET).upload(path, file, {contentType: file.type || 'application/octet-stream'});
+      if(up.error){ toast('Upload failed: '+up.error.message, 5000); continue; }
+      const {data, error} = await sb.from('opportunity_files').insert({opportunity_id:oppId, file_name:file.name, storage_path:path, size_bytes:file.size, content_type:file.type||null, uploaded_by:session.user.id}).select().single();
+      if(error){ await sb.storage.from(FILE_BUCKET).remove([path]); toast('Could not save file: '+error.message, 5000); continue; }
+      upsertLocal('files', mapFileFromDb(data)); ok++;
+    }
+    render(); if(ok) toast(ok+' file'+(ok>1?'s':'')+' attached');
+  }, 'change');
+  bind('download-file', async (el)=>{
+    const f = state.files.find(x=>x.id===el.dataset.id); if(!f) return;
+    const {data, error} = await sb.storage.from(FILE_BUCKET).createSignedUrl(f.path, 60, {download: f.name});
+    if(error){ toast('Could not open file: '+error.message, 4000); return; }
+    const a = document.createElement('a'); a.href = data.signedUrl; a.download = f.name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+  });
+  bind('delete-file', async (el)=>{
+    const f = state.files.find(x=>x.id===el.dataset.id); if(!f || !confirm('Remove "'+f.name+'"? This cannot be undone.')) return;
+    const {error} = await sb.from('opportunity_files').delete().eq('id', f.id);
+    if(error){ toast('Error: '+error.message); return; }
+    await sb.storage.from(FILE_BUCKET).remove([f.path]);
+    removeLocal('files', f.id); render(); toast('File removed');
   });
   bind('delete-task', async (el)=>{
     const id = el.dataset.id;
