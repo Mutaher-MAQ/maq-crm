@@ -187,6 +187,8 @@
   .name-cell{display:flex;align-items:center;gap:10px;}
   .header-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
   .dept-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .view-toggle{display:inline-flex;gap:6px;margin-right:4px;}
+  .view-toggle .dept-tab{min-height:38px;padding:7px 13px;}
   .dept-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;min-height:40px;border-radius:999px;border:1px solid var(--border);background:#fff;color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
   .dept-tab:hover{border-color:var(--primary);}
   .dept-tab.active{background:var(--primary);border-color:var(--primary);color:#fff;}
@@ -1162,14 +1164,92 @@ function renderAlerts(){
 }
 
 /* ---------------- Leads (Kanban) ---------------- */
+/* ---------------- Board / list toggle for Leads and RFQs ---------------- */
+// Remembered per board in this browser; the board (kanban) stays the default.
+const boardMode = {leads:'board', rfq:'board'};
+try{ Object.assign(boardMode, JSON.parse(localStorage.getItem('maq-board-mode')||'{}')); }catch(e){}
+let listStatus = {leads:'', rfq:''};
+function viewToggle(board){
+  const m = boardMode[board];
+  return `<div class="view-toggle" role="group" aria-label="View as">
+    <button class="dept-tab ${m==='board'?'active':''}" data-action="set-view-mode" data-board="${board}" data-mode="board" title="Board view">${icon('rfq',14)} Board</button>
+    <button class="dept-tab ${m==='list'?'active':''}" data-action="set-view-mode" data-board="${board}" data-mode="list" title="List view">${icon('menu',14)} List</button>
+  </div>`;
+}
+function matchesSearch(o){
+  const q = searchQuery.toLowerCase(); if(!q) return true;
+  return [o.projectName, o.itemProduct, o.rfqNumber, o.opportunityNumber, o.oemReferenceNumber, customerName(o.customerId), oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):''].some(v=>(v||'').toLowerCase().includes(q));
+}
+function listToolbar(board, columns, counts, placeholder, exportAction){
+  const cur = listStatus[board];
+  return `
+  <div class="dept-tabs">
+    <button class="dept-tab ${!cur?'active':''}" data-action="list-status" data-board="${board}" data-status="">All <span class="count-pill">${counts.all}</span></button>
+    ${columns.map(c=>`<button class="dept-tab ${cur===c.id?'active':''}" data-action="list-status" data-board="${board}" data-status="${c.id}">${esc(c.label)} <span class="count-pill">${counts[c.id]||0}</span></button>`).join('')}
+  </div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="${placeholder}" value="${esc(searchQuery)}" data-action="search"></div></div>`;
+}
+function renderLeadsList(leads){
+  const counts = {all:leads.length}; LEAD_COLUMNS.forEach(c=>counts[c.id]=leads.filter(o=>o.leadStatus===c.id).length);
+  const cur = listStatus.leads;
+  const rows = leads.filter(o=>(!cur || o.leadStatus===cur) && matchesSearch(o)).sort((a,b)=>b.createdAt-a.createdAt);
+  const stage = o => { const c = LEAD_COLUMNS.find(x=>x.id===o.leadStatus); return c ? `<span class="badge" style="background:color-mix(in srgb,${c.color} 14%,#fff);color:${c.color};">${esc(c.label)}</span>` : '—'; };
+  return listToolbar('leads', LEAD_COLUMNS, counts, 'Search leads...', 'export-leads') + `
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Customer / Item</th><th>Status</th><th>Source</th><th>Score</th><th>Assigned</th><th>Added</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(o=>`
+          <tr data-action="open-opportunity" data-id="${o.id}">
+            <td><div>${esc(o.projectName||o.itemProduct||'Untitled Lead')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.itemProduct&&o.projectName?' · '+esc(o.itemProduct):''}</div></td>
+            <td>${stage(o)}</td>
+            <td>${esc((LEAD_SOURCES.find(s=>s.id===o.leadSource)||{}).label||'—')}</td>
+            <td class="num">${o.leadScore??'—'}</td>
+            <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}<div class="sub-text">${esc(o.department||'')}</div></td>
+            <td class="sub-text">${fmtDate(o.createdAt)}</td>
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="6">${searchQuery||cur ? 'No leads match.' : 'No leads yet.'}</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+function renderRfqList(rfqs){
+  const cols = RFQ_COLUMNS.filter(c=>c.id!=='won');
+  const statusOf = o => (o.winLose==='lost' || o.rfqStatus==='not_interested') ? 'not_interested' : (o.rfqStatus==='awaiting_response' ? 'offer_submitted' : o.rfqStatus);
+  const counts = {all:rfqs.length}; cols.forEach(c=>counts[c.id]=rfqs.filter(o=>statusOf(o)===c.id).length);
+  const cur = listStatus.rfq;
+  const order = {not_started:0, in_progress:1, offer_submitted:2, not_interested:3};
+  const rows = rfqs.filter(o=>(!cur || statusOf(o)===cur) && matchesSearch(o)).sort((a,b)=>(order[statusOf(a)]??9)-(order[statusOf(b)]??9) || (a.dueDate||Infinity)-(b.dueDate||Infinity) || b.createdAt-a.createdAt);
+  const stage = o => { const c = cols.find(x=>x.id===statusOf(o)); return c ? `<span class="badge" style="background:color-mix(in srgb,${c.color} 14%,#fff);color:${c.color};white-space:normal;">${esc(c.label)}</span>` : '—'; };
+  return listToolbar('rfq', cols, counts, 'Search RFQs by customer, item, RFQ #, principal, owner...', 'export-rfqs') + `
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table>
+      <thead><tr><th>Customer / Item</th><th>RFQ #</th><th>Principal</th><th>Status</th><th>Priority</th><th>Offer value</th><th>Offer due</th><th>Follow-up</th><th>Assigned</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(o=>{ const f = followUpInfo(o); return `
+          <tr data-action="open-opportunity" data-id="${o.id}">
+            <td><div>${esc(o.projectName||o.itemProduct||'Untitled')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>
+            <td class="mono">${esc(o.rfqNumber||'—')}</td>
+            <td>${esc(oppPrincipalNames(o)||'—')}</td>
+            <td>${stage(o)}</td>
+            <td><span class="badge ${priorityBadge(o.priority)}">${priorityLabel(o.priority)}</span></td>
+            <td class="num">${o.poValue ? esc(fmtMoney(o.poValue, o.currency)) : '—'}</td>
+            <td class="sub-text">${o.dueDate ? fmtDate(o.dueDate) : '—'}</td>
+            <td>${f ? `<span class="badge ${f.badge}">⏰ ${f.label}</span>` : (o.followUpDate ? `<span class="sub-text">${fmtDate(o.followUpDate)}</span>` : '—')}</td>
+            <td>${o.assignedTo?esc(profileName(o.assignedTo)):'—'}<div class="sub-text">${esc(o.department||'')}</div></td>
+          </tr>`; }).join('') : `<tr class="empty-row"><td colspan="9">${searchQuery||cur ? 'No RFQs match.' : 'No RFQs yet.'}</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 function renderLeads(){
   const leads = state.opportunities.filter(o=>o.pipelineStage==='lead');
   return `
   <div class="page-header">
     <div><h1 class="page-title">Leads</h1><div class="page-subtitle">${leads.length} total · raw inquiries not yet confirmed as opportunities</div></div>
-    <div class="header-actions"><button class="btn btn-secondary" data-action="export-leads">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-lead">+ New Lead</button></div>
+    <div class="header-actions">${viewToggle('leads')}<button class="btn btn-secondary" data-action="export-leads">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-lead">+ New Lead</button></div>
   </div>
-  <div class="kanban">
+  ${boardMode.leads==='list' ? renderLeadsList(leads) : `<div class="kanban">
     ${LEAD_COLUMNS.map(col=>{
       const cards = leads.filter(o=>o.leadStatus===col.id);
       return `<div class="kanban-col" style="--col:${col.color}">
@@ -1184,7 +1264,7 @@ function renderLeads(){
         </div>
       </div>`;
     }).join('')}
-  </div>
+  </div>`}
   `;
 }
 
@@ -1194,9 +1274,9 @@ function renderOpportunities(){
   return `
   <div class="page-header">
     <div><h1 class="page-title">RFQs / Opportunities</h1><div class="page-subtitle">${rfqs.length} total · drag a card to "Won" to promote it to Orders & POs</div></div>
-    <div class="header-actions"><button class="btn btn-secondary" data-action="export-rfqs">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-opportunity">+ New Opportunity</button></div>
+    <div class="header-actions">${viewToggle('rfq')}<button class="btn btn-secondary" data-action="export-rfqs">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-opportunity">+ New Opportunity</button></div>
   </div>
-  <div class="kanban">
+  ${boardMode.rfq==='list' ? renderRfqList(rfqs) : `<div class="kanban">
     ${RFQ_COLUMNS.map(col=>{
       // "awaiting_response" was retired: any leftover record shows under Offer Submitted
       const cards = col.id==='won' ? [] : rfqs.filter(o=>(o.rfqStatus===col.id || (col.id==='offer_submitted' && o.rfqStatus==='awaiting_response')) && o.winLose!=='lost') ;
@@ -1216,7 +1296,7 @@ function renderOpportunities(){
         </div>
       </div>`;
     }).join('')}
-  </div>
+  </div>`}
   `;
 }
 
@@ -2057,6 +2137,8 @@ function attachGlobalHandlers(){
     );
   });
   bind('contact-filter', (el)=>{ contactFilter = el.dataset.filter; render(); });
+  bind('set-view-mode', (el)=>{ boardMode[el.dataset.board] = el.dataset.mode; try{ localStorage.setItem('maq-board-mode', JSON.stringify(boardMode)); }catch(e){} render(); });
+  bind('list-status', (el)=>{ listStatus[el.dataset.board] = el.dataset.status; render(); });
 
   // Merge two duplicate customers or principals (admin only). Everything moves first; the duplicate is
   // deleted only after every move has succeeded, so a failure part-way never loses a record.
