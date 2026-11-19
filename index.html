@@ -626,7 +626,7 @@ function resetAppState(){
   try { if(loadedUserId) sessionStorage.removeItem('alertsShown:'+loadedUserId); } catch(e){}
   unsubscribeRealtime();
   dataLoaded = false; bootstrapStarted = false; loadedUserId = null;
-  modal = null; view = 'dashboard'; searchQuery = ''; deptFilter = '';
+  modal = null; view = 'dashboard'; searchQuery = ''; deptFilter = ''; fzcFilter = '';
   state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[],notifications:[]};
 }
 
@@ -1201,7 +1201,12 @@ function viewToggle(board){
 }
 // Small tag shown on records that belong to MAQINT FZC, our offshore company
 function fzcBadge(o){ return o.maqintFzc ? ' <span class="badge badge-purple" title="MAQINT FZC (offshore company)" style="vertical-align:middle;">FZC</span>' : ''; }
+// Filter by company: everything, MAQINT FZC only, or everything except MAQINT FZC
+let fzcFilter = '';
+function passFzc(o){ return !fzcFilter || (fzcFilter==='fzc' ? !!o.maqintFzc : !o.maqintFzc); }
+function fzcSelect(){ return `<select data-action="fzc-filter" title="Filter by company" style="width:auto;min-width:170px;"><option value="">All companies</option><option value="fzc" ${fzcFilter==='fzc'?'selected':''}>MAQINT FZC only</option><option value="local" ${fzcFilter==='local'?'selected':''}>Excluding MAQINT FZC</option></select>`; }
 function matchesSearch(o){
+  if(!passFzc(o)) return false;
   const q = searchQuery.toLowerCase(); if(!q) return true;
   return [o.projectName, o.itemProduct, o.rfqNumber, o.opportunityNumber, o.oemReferenceNumber, customerName(o.customerId), oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):''].some(v=>(v||'').toLowerCase().includes(q));
 }
@@ -1212,7 +1217,7 @@ function listToolbar(board, columns, counts, placeholder, exportAction){
     <button class="dept-tab ${!cur?'active':''}" data-action="list-status" data-board="${board}" data-status="">All <span class="count-pill">${counts.all}</span></button>
     ${columns.map(c=>`<button class="dept-tab ${cur===c.id?'active':''}" data-action="list-status" data-board="${board}" data-status="${c.id}">${esc(c.label)} <span class="count-pill">${counts[c.id]||0}</span></button>`).join('')}
   </div>
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="${placeholder}" value="${esc(searchQuery)}" data-action="search"></div></div>`;
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="${placeholder}" value="${esc(searchQuery)}" data-action="search"></div>${fzcSelect()}</div>`;
 }
 function renderLeadsList(leads){
   const counts = {all:leads.length}; LEAD_COLUMNS.forEach(c=>counts[c.id]=leads.filter(o=>o.leadStatus===c.id).length);
@@ -1274,9 +1279,10 @@ function renderLeads(){
     <div><h1 class="page-title">Leads</h1><div class="page-subtitle">${leads.length} total · raw inquiries not yet confirmed as opportunities</div></div>
     <div class="header-actions">${viewToggle('leads')}<button class="btn btn-secondary" data-action="export-leads">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-lead">+ New Lead</button></div>
   </div>
-  ${boardMode.leads==='list' ? renderLeadsList(leads) : `<div class="kanban">
+  ${boardMode.leads==='list' ? renderLeadsList(leads) : `<div class="toolbar"><div class="search-box"><input type="text" placeholder="Search leads by customer, item or owner..." value="${esc(searchQuery)}" data-action="search"></div>${fzcSelect()}</div>
+  <div class="kanban">
     ${LEAD_COLUMNS.map(col=>{
-      const cards = leads.filter(o=>o.leadStatus===col.id);
+      const cards = leads.filter(matchesSearch).filter(o=>o.leadStatus===col.id);
       return `<div class="kanban-col" style="--col:${col.color}">
         <div class="kanban-col-header"><span>${col.label} <span class="count-pill">${cards.length}</span></span></div>
         <div class="kanban-col-body" data-board="leads" data-col="${col.id}">
@@ -1301,7 +1307,7 @@ function renderOpportunities(){
     <div><h1 class="page-title">RFQs / Opportunities</h1><div class="page-subtitle">${rfqs.length} total · drag a card to "Won" to promote it to Orders & POs</div></div>
     <div class="header-actions">${viewToggle('rfq')}<button class="btn btn-secondary" data-action="export-rfqs">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-opportunity">+ New Opportunity</button></div>
   </div>
-  ${boardMode.rfq==='list' ? renderRfqList(rfqs) : `<div class="toolbar"><div class="search-box"><input type="text" placeholder="Search RFQs by customer, RFQ #, item, principal or owner..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  ${boardMode.rfq==='list' ? renderRfqList(rfqs) : `<div class="toolbar"><div class="search-box"><input type="text" placeholder="Search RFQs by customer, RFQ #, item, principal or owner..." value="${esc(searchQuery)}" data-action="search"></div>${fzcSelect()}</div>
   <div class="kanban">
     ${RFQ_COLUMNS.map(col=>{
       // "awaiting_response" was retired: any leftover record shows under Offer Submitted
@@ -1429,7 +1435,7 @@ function renderArchived(){
 // Orders matching the search box and the department buttons
 function orderRows(){
   const q = searchQuery.toLowerCase();
-  return state.opportunities.filter(o => o.pipelineStage==='order' && (!deptFilter || o.department===deptFilter) && (
+  return state.opportunities.filter(o => o.pipelineStage==='order' && passFzc(o) && (!deptFilter || o.department===deptFilter) && (
     !q || (o.projectName||'').toLowerCase().includes(q) || (o.poNumber||'').toLowerCase().includes(q) || (o.jobNumber||'').toLowerCase().includes(q) || (o.opportunityNumber||'').toLowerCase().includes(q) ||
     (o.itemProduct||'').toLowerCase().includes(q) || customerName(o.customerId).toLowerCase().includes(q)
   )).sort((a,b)=>b.createdAt-a.createdAt);
@@ -1450,7 +1456,7 @@ function renderOrders(){
     <button class="btn" data-action="new-order">+ New Order</button>
   </div>
   ${deptTabs}
-  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div><button class="btn btn-secondary" data-action="export-orders">${icon('download',15)} Export to Excel</button></div>
+  <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div>${fzcSelect()}<button class="btn btn-secondary" data-action="export-orders">${icon('download',15)} Export to Excel</button></div>
   <div class="panel" style="padding:0;overflow-x:auto;">
     <table>
       <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>Payment Terms</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
@@ -2043,7 +2049,7 @@ function renderOpportunityForm(){
 function attachGlobalHandlers(){
   const app = document.getElementById('app');
 
-  app.querySelectorAll('[data-nav]').forEach(el=>{ el.addEventListener('click', ()=>{ view = el.dataset.nav; searchQuery=''; modal=null; navOpen=false; enterView(); render(); window.scrollTo(0,0); }); });
+  app.querySelectorAll('[data-nav]').forEach(el=>{ el.addEventListener('click', ()=>{ view = el.dataset.nav; searchQuery=''; fzcFilter=''; modal=null; navOpen=false; enterView(); render(); window.scrollTo(0,0); }); });
   // Collapsible sections animate open/closed in place; the set remembers the choice across redraws
   bind('toggle-section', (el)=>{
     const box = el.closest('.collapsible'); if(!box) return;
@@ -2250,6 +2256,7 @@ function attachGlobalHandlers(){
   bind('open-principal', (el)=>{ modal={type:'principal-form', id:el.dataset.id}; render(); });
   bind('open-contact', (el)=>{ modal={type:'contact-form', id:el.dataset.id}; render(); });
   bind('open-opportunity', (el)=>{ modal={type:'opportunity-form', id:el.dataset.id}; render(); });
+  bind('fzc-filter', (el)=>{ fzcFilter = el.value; render(); }, 'change');
   bind('open-notification', async (el)=>{
     const n = state.notifications.find(x=>x.id===el.dataset.id); if(!n) return;
     if(!n.readAt){
