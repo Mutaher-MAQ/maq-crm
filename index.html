@@ -1274,11 +1274,12 @@ function renderOpportunities(){
     <div><h1 class="page-title">RFQs / Opportunities</h1><div class="page-subtitle">${rfqs.length} total · drag a card to "Won" to promote it to Orders & POs</div></div>
     <div class="header-actions">${viewToggle('rfq')}<button class="btn btn-secondary" data-action="export-rfqs">${icon('download',15)} Export to Excel</button><button class="btn" data-action="new-opportunity">+ New Opportunity</button></div>
   </div>
-  ${boardMode.rfq==='list' ? renderRfqList(rfqs) : `<div class="kanban">
+  ${boardMode.rfq==='list' ? renderRfqList(rfqs) : `<div class="toolbar"><div class="search-box"><input type="text" placeholder="Search RFQs by customer, RFQ #, item, principal or owner..." value="${esc(searchQuery)}" data-action="search"></div></div>
+  <div class="kanban">
     ${RFQ_COLUMNS.map(col=>{
       // "awaiting_response" was retired: any leftover record shows under Offer Submitted
-      const cards = col.id==='won' ? [] : rfqs.filter(o=>(o.rfqStatus===col.id || (col.id==='offer_submitted' && o.rfqStatus==='awaiting_response')) && o.winLose!=='lost') ;
-      const list = col.id==='not_interested' ? rfqs.filter(o=>o.winLose==='lost' || o.rfqStatus==='not_interested') : cards;
+      const cards = col.id==='won' ? [] : rfqs.filter(matchesSearch).filter(o=>(o.rfqStatus===col.id || (col.id==='offer_submitted' && o.rfqStatus==='awaiting_response')) && o.winLose!=='lost') ;
+      const list = col.id==='not_interested' ? rfqs.filter(matchesSearch).filter(o=>o.winLose==='lost' || o.rfqStatus==='not_interested') : cards;
       return `<div class="kanban-col" style="--col:${col.color}">
         <div class="kanban-col-header"><span>${col.label} <span class="count-pill">${list.length}</span></span></div>
         <div class="kanban-col-body" data-board="rfq" data-col="${col.id}">
