@@ -441,7 +441,7 @@ const PAYMENT_COLUMNS = [
   {id:'received', label:'Received', color:'#16a34a'},
 ];
 const DEPARTMENTS = ['Instrumentation & Control','Electrical','Oil & Gas','Exploration & Production','Power & Business Development'];
-const ROLES = [{id:'employee', label:'Employee'}, {id:'manager', label:'Manager'}, {id:'director', label:'Director (view all, read-only)'}, {id:'admin', label:'Admin'}];
+const ROLES = [{id:'employee', label:'Associate'}, {id:'supervisor', label:'Supervisor'}, {id:'manager', label:'Manager'}, {id:'director', label:'Director (view all, read-only)'}, {id:'admin', label:'Admin'}];
 
 /* ---------------- State ---------------- */
 let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
@@ -459,7 +459,8 @@ let dataLoaded = false;
 let passwordRecoveryMode = false;
 
 /* ---------------- Auth & data bootstrap ---------------- */
-function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||'', department:r.department||'', extraDepartments:r.extra_departments||[], extraPrincipals:r.extra_principals||[], role:r.role||'employee'}; }
+function mapProfileFromDb(r){ return {id:r.id, email:r.email||'', fullName:r.full_name||r.email||'', department:r.department||'', extraDepartments:r.extra_departments||[], extraPrincipals:r.extra_principals||[], role:r.role||'employee', reportsTo:r.reports_to||''}; }
+function roleLabel(role){ const r = ROLES.find(x=>x.id===role); return r ? r.label.replace(/ \(.*\)$/,'') : (role||''); }
 function currentProfile(){ return session ? state.profiles.find(p=>p.id===session.user.id) : null; }
 // Departments the signed-in user belongs to (admins cover all of them)
 function myDepartments(){
@@ -977,7 +978,7 @@ function renderSidebar(){
   const me = currentProfile();
   const isAdmin = me && me.role === 'admin';
   const navItem = i => `<div class="nav-item ${(view===i.id || (i.id==='principals' && view==='principal-detail'))?'active':''}" data-nav="${i.id}"><span class="nav-icon">${icon(i.icon,18)}</span> ${i.label}</div>`;
-  const roleLine = me ? [me.role ? me.role.charAt(0).toUpperCase()+me.role.slice(1) : '', me.department].filter(Boolean).join(' · ') : '';
+  const roleLine = me ? [roleLabel(me.role), me.department].filter(Boolean).join(' · ') : '';
   const who = (me && me.fullName && me.fullName !== me.email) ? me.fullName : session.user.email;
   return `
   <div class="sidebar ${navOpen?'open':''}">
@@ -1681,7 +1682,9 @@ function renderTeam(){
             <td><select data-field="department" style="min-width:200px;"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===p.department?'selected':''}>${d}</option>`).join('')}</select></td>
             <td><div style="display:flex;flex-direction:column;gap:3px;min-width:210px;">${DEPARTMENTS.map(d=>`<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin:0;font-weight:400;"><input type="checkbox" data-extra-dept="${esc(d)}" ${(p.extraDepartments||[]).includes(d)?'checked':''} style="width:auto;margin:0;">${esc(d)}</label>`).join('')}</div></td>
             <td><div style="display:flex;flex-direction:column;gap:3px;min-width:170px;max-height:112px;overflow-y:auto;">${[...state.principals].sort((a,b)=>a.name.localeCompare(b.name)).map(pr=>`<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin:0;font-weight:400;"><input type="checkbox" data-extra-principal="${pr.id}" ${(p.extraPrincipals||[]).includes(pr.id)?'checked':''} style="width:auto;margin:0;">${esc(pr.name)}</label>`).join('')}</div></td>
-            <td><select data-field="role" style="min-width:110px;">${ROLES.map(r=>`<option value="${r.id}" ${r.id===p.role?'selected':''}>${r.label}</option>`).join('')}</select></td>
+            <td><select data-field="role" style="min-width:110px;">${ROLES.map(r=>`<option value="${r.id}" ${r.id===p.role?'selected':''}>${r.label}</option>`).join('')}</select>
+              <div style="font-size:11.5px;color:var(--text-muted);margin:8px 0 3px;">Reports to</div>
+              <select data-field="reportsTo" style="min-width:110px;"><option value="">—</option>${state.profiles.filter(x=>x.id!==p.id && ['supervisor','manager'].includes(x.role)).map(x=>`<option value="${x.id}" ${x.id===p.reportsTo?'selected':''}>${esc(x.fullName)}</option>`).join('')}</select></td>
             <td onclick="event.stopPropagation()"><button class="btn btn-sm" data-action="save-team-member" data-id="${p.id}">Save</button></td>
           </tr>`).join('')}
       </tbody>
@@ -2037,7 +2040,7 @@ function attachGlobalHandlers(){
       {name:'Contacts', headers:['Name','Email','Phone','Title','Customer','Notes'], rows:state.contacts.map(c=>[c.name,c.email||'',c.phone||'',c.title||'',customerName(c.customerId),c.notes||''])},
       {name:'Tasks', headers:['Task','Due','Done','Notes'], rows:state.tasks.map(t=>[t.title,t.dueDate?fmtDate(t.dueDate):'',t.done?'Yes':'No',t.notes||''])},
       {name:'Activities', headers:['Date','Type','Note','Related Record'], rows:state.activities.map(a=>[fmtDate(a.timestamp),a.type,a.note,a.opportunityId?opportunityLabel(a.opportunityId):''])},
-      {name:'Team', headers:['Name','Email','Role','Department','Also Covers','Also Sees Principals'], rows:state.profiles.map(p=>[p.fullName,p.email,p.role,p.department||'',(p.extraDepartments||[]).join(', '),(p.extraPrincipals||[]).map(principalName).join(', ')])},
+      {name:'Team', headers:['Name','Email','Role','Reports To','Department','Also Covers','Also Sees Principals'], rows:state.profiles.map(p=>[p.fullName,p.email,roleLabel(p.role),p.reportsTo?profileName(p.reportsTo):'',p.department||'',(p.extraDepartments||[]).join(', '),(p.extraPrincipals||[]).map(principalName).join(', ')])},
     ]);
   });
   bind('export-lost', ()=>{
@@ -2251,7 +2254,8 @@ function attachGlobalHandlers(){
     const role = row.querySelector('[data-field="role"]').value;
     const extra_departments = [...row.querySelectorAll('[data-extra-dept]')].filter(c=>c.checked).map(c=>c.dataset.extraDept).filter(d=>d!==department);
     const extra_principals = [...row.querySelectorAll('[data-extra-principal]')].filter(c=>c.checked).map(c=>c.dataset.extraPrincipal);
-    const {data, error} = await sb.from('profiles').update({department, role, extra_departments, extra_principals}).eq('id', id).select().single();
+    const reports_to = row.querySelector('[data-field="reportsTo"]').value || null;
+    const {data, error} = await sb.from('profiles').update({department, role, reports_to, extra_departments, extra_principals}).eq('id', id).select().single();
     if(error){ toast('Error: '+error.message); return; }
     upsertLocal('profiles', mapProfileFromDb(data));
     render(); toast('Team member updated');
