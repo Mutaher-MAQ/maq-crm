@@ -630,10 +630,39 @@ function resetAppState(){
   state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[],notifications:[]};
 }
 
+// Sign people out after 15 minutes without any activity (mouse, keys, touch, scroll).
+// The last-activity time is kept in localStorage so it also applies after closing and reopening the tab.
+const IDLE_LIMIT_MS = 15*60*1000;
+const IDLE_KEY = 'maqLastActive';
+let idleSigningOut = false;
+function lastActive(){ try { return Number(localStorage.getItem(IDLE_KEY)) || 0; } catch(e){ return 0; } }
+function touchActive(){ try { localStorage.setItem(IDLE_KEY, String(Date.now())); } catch(e){} }
+function idleExpired(){ const la = lastActive(); return !!la && Date.now() - la > IDLE_LIMIT_MS; }
+async function idleCheck(){
+  if(!session || idleSigningOut || !idleExpired()) return;
+  idleSigningOut = true;
+  authError = 'You were signed out after 15 minutes of inactivity. Please sign in again.';
+  try { await sb.auth.signOut(); } catch(e){}
+  idleSigningOut = false;
+}
+(function(){
+  let lastWrite = 0;
+  const onActivity = ()=>{
+    if(!session) return;
+    if(idleExpired()){ idleCheck(); return; }   // too late: don't let a stray mouse move revive an expired session
+    const now = Date.now();
+    if(now - lastWrite > 5000){ lastWrite = now; touchActive(); }
+  };
+  ['mousedown','mousemove','keydown','touchstart','scroll','click'].forEach(ev=>window.addEventListener(ev, onActivity, {passive:true, capture:true}));
+  setInterval(idleCheck, 30000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) idleCheck(); });
+})();
+
 // Never await Supabase calls inside onAuthStateChange (it deadlocks the auth lock) — defer with setTimeout.
 sb.auth.onAuthStateChange((event, sess)=>{
   session = sess;
   authChecked = true;
+  if(sess && event==='INITIAL_SESSION'){ if(!lastActive()) touchActive(); else if(idleExpired()){ setTimeout(idleCheck,0); return; } }
   setTimeout(()=>{
     if(event === 'PASSWORD_RECOVERY'){ passwordRecoveryMode = true; render(); return; }
     if(!session){ passwordRecoveryMode = false; resetAppState(); render(); return; }
@@ -941,7 +970,7 @@ function attachAuthHandlers(){
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const fd = new FormData(form);
-    authLoading = true; authError=''; render();
+    authLoading = true; authError=''; touchActive(); render();
     const {error} = await sb.auth.signInWithPassword({email:fd.get('email').trim(), password:fd.get('password')});
     authLoading = false;
     if(error){ authError = error.message; render(); }
@@ -1063,22 +1092,24 @@ function renderDashboard(){
   const recentActivities = [...state.activities].sort((a,b)=>b.timestamp-a.timestamp).slice(0,6);
   const upcomingTasks = [...openTasks].sort((a,b)=>(a.dueDate||0)-(b.dueDate||0)).slice(0,6);
 
-  const maxCount = Math.max(1, openLeads.length, openRfqs.length, orders.length, receivable.length);
+  const me0 = currentProfile();
+  const showPayment = !(me0 && me0.role==='employee');   // Associates don't see the payment figures
+  const maxCount = Math.max(1, openLeads.length, openRfqs.length, orders.length, showPayment ? receivable.length : 0);
   const funnelBars = [
     {label:'Leads', count:openLeads.length, color:'#3bc1eb'},
     {label:'Open RFQs', count:openRfqs.length, color:'#2a5fc4'},
     {label:'Orders', count:orders.length, color:'#1f3864'},
-    {label:'Awaiting Payment', count:receivable.length, color:'#e0912a'},
+    ...(showPayment ? [{label:'Awaiting Payment', count:receivable.length, color:'#e0912a'}] : []),
   ];
 
   return `
-  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">Leads → RFQ → Order → Payment, at a glance</div></div><div class="header-actions">${myAlerts().total ? `<button class="btn btn-secondary" data-action="show-alerts">🔔 ${myAlerts().total} need attention</button>` : ''}${(currentProfile()||{}).role==='admin' ? `<button class="btn btn-secondary" data-action="export-backup" title="One Excel file with every record: opportunities, customers, principals, contacts, tasks, activities and team">${icon('download',15)} Download full backup</button>` : ''}</div></div>
+  <div class="page-header"><div><h1 class="page-title">Dashboard</h1><div class="page-subtitle">${showPayment ? 'Leads → RFQ → Order → Payment, at a glance' : 'Leads → RFQ → Order, at a glance'}</div></div><div class="header-actions">${myAlerts().total ? `<button class="btn btn-secondary" data-action="show-alerts">🔔 ${myAlerts().total} need attention</button>` : ''}${(currentProfile()||{}).role==='admin' ? `<button class="btn btn-secondary" data-action="export-backup" title="One Excel file with every record: opportunities, customers, principals, contacts, tasks, activities and team">${icon('download',15)} Download full backup</button>` : ''}</div></div>
 
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-top"><span class="stat-label">Open Leads</span><span class="stat-icon">${icon('leads',18)}</span></div><div class="stat-value">${openLeads.length}</div><div class="stat-sub">${leads.length} total</div><div class="stat-meter" title="Open vs closed leads"><i style="flex:${openLeads.length};background:var(--accent)"></i><i style="flex:${Math.max(0,leads.length-openLeads.length)};background:var(--border-strong)"></i></div></div>
     <div class="stat-card"><div class="stat-top"><span class="stat-label">Open RFQs</span><span class="stat-icon cyan">${icon('rfq',18)}</span></div><div class="stat-value">${openRfqs.length}</div><div class="stat-sub">${won.length} won · ${lost.length} lost</div><div class="stat-meter" title="Open / won / lost"><i style="flex:${openRfqs.length};background:var(--blue)"></i><i style="flex:${won.length};background:var(--green)"></i><i style="flex:${lost.length};background:var(--red)"></i></div></div>
     <div class="stat-card"><div class="stat-top"><span class="stat-label">Won Value</span><span class="stat-icon green">${icon('check',18)}</span></div>${curRows(wonByCurrency)}<div class="stat-sub">${won.length} order${won.length!==1?'s':''}</div></div>
-    <div class="stat-card"><div class="stat-top"><span class="stat-label">Awaiting Payment</span><span class="stat-icon amber">${icon('clock',18)}</span></div>${curRows(receivableByCurrency)}<div class="stat-sub">${receivable.length} order${receivable.length!==1?'s':''}</div></div>
+    ${showPayment ? `<div class="stat-card"><div class="stat-top"><span class="stat-label">Awaiting Payment</span><span class="stat-icon amber">${icon('clock',18)}</span></div>${curRows(receivableByCurrency)}<div class="stat-sub">${receivable.length} order${receivable.length!==1?'s':''}</div></div>` : ''}
   </div>
 
   <div class="dash-grid">
