@@ -335,7 +335,7 @@ const ICON_PATHS = {
   contacts:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   tasks:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>',
   team:'<circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 21a7 7 0 0 0-3-5.8"/>',
-  paperclip:'<path d="M21 11l-9 9a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
   chevron:'<path d="M6 9l6 6 6-6"/>',
   trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -444,7 +444,9 @@ const DEPARTMENTS = ['Instrumentation & Control','Electrical','Oil & Gas','Explo
 const ROLES = [{id:'employee', label:'Associate'}, {id:'supervisor', label:'Supervisor'}, {id:'manager', label:'Manager'}, {id:'director', label:'Director (view all, read-only)'}, {id:'admin', label:'Admin'}];
 
 /* ---------------- State ---------------- */
-let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[]};
+let state = {profiles:[], customers:[], principals:[], contacts:[], opportunities:[], archivedOpportunities:[], opportunityPrincipals:[], tasks:[], activities:[], notifications:[]};
+function mapNotificationFromDb(r){ return {id:r.id, kind:r.kind, title:r.title, body:r.body||'', opportunityId:r.opportunity_id||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(), readAt: r.read_at ? new Date(r.read_at).getTime() : null}; }
+function unreadCount(){ return state.notifications.filter(n=>!n.readAt).length; }
 let view = 'dashboard';
 let navOpen = false;
 let searchQuery = '';
@@ -490,6 +492,7 @@ function mapOpportunityFromDb(r){
     lcStatus:r.lc_status||'pending', shipmentStatus:r.shipment_status||'pending',
     saleDate: r.sale_date ? new Date(r.sale_date+'T00:00:00').getTime() : null, paymentStatus:r.payment_status||'receivable',
     commissionStatus:r.commission_status||'', commissionRate:r.commission_rate,
+    maqintFzc:!!r.maqint_fzc,
     notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()
   };
 }
@@ -537,6 +540,25 @@ async function loadAllData(){
   state.opportunityPrincipals = (opr.data||[]).map(r=>({opportunityId:r.opportunity_id, principalId:r.principal_id}));
   state.tasks = (ta.data||[]).map(mapTaskFromDb);
   state.activities = (ac.data||[]).map(mapActivityFromDb);
+  // Notifications: first have the database add today's due/overdue ones, then load this person's list
+  try{ await sb.rpc('generate_due_notifications'); }catch(e){}
+  try{
+    const nf = await sb.from('notifications').select('*').order('created_at', {ascending:false}).limit(100);
+    state.notifications = (nf.data||[]).map(mapNotificationFromDb); // empty until migration_notifications.sql has been run
+  }catch(e){ state.notifications = []; }
+}
+
+// A new notification arrived live: add it, tell the person, and pop a desktop alert if they allowed it
+function onNotificationChange(p){
+  if(p.eventType==='DELETE'){ state.notifications = state.notifications.filter(n=>n.id!==p.old.id); render(); return; }
+  const n = mapNotificationFromDb(p.new);
+  const i = state.notifications.findIndex(x=>x.id===n.id);
+  if(i>-1) state.notifications[i] = n; else state.notifications.unshift(n);
+  if(p.eventType==='INSERT' && !n.readAt){
+    toast(n.title, 4500);
+    try{ if('Notification' in window && Notification.permission==='granted') new Notification('MAQ CRM', {body:n.title, tag:n.id}); }catch(e){}
+  }
+  render();
 }
 
 async function reloadOpportunityPrincipals(){
@@ -567,6 +589,7 @@ function subscribeRealtime(){
     .on('postgres_changes', {event:'*', schema:'public', table:'opportunity_principals'}, async ()=>{ await reloadOpportunityPrincipals(); render(); })
     .on('postgres_changes', {event:'*', schema:'public', table:'tasks'}, p=>applyRealtimeChange('tasks', mapTaskFromDb, p))
     .on('postgres_changes', {event:'*', schema:'public', table:'activities'}, p=>applyRealtimeChange('activities', mapActivityFromDb, p))
+    .on('postgres_changes', {event:'*', schema:'public', table:'notifications', filter:'user_id=eq.'+(session&&session.user?session.user.id:'')}, onNotificationChange)
     .subscribe();
 }
 
@@ -604,7 +627,7 @@ function resetAppState(){
   unsubscribeRealtime();
   dataLoaded = false; bootstrapStarted = false; loadedUserId = null;
   modal = null; view = 'dashboard'; searchQuery = ''; deptFilter = '';
-  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[]};
+  state = {profiles:[],customers:[],principals:[],contacts:[],opportunities:[],archivedOpportunities:[],opportunityPrincipals:[],tasks:[],activities:[],notifications:[]};
 }
 
 // Never await Supabase calls inside onAuthStateChange (it deadlocks the auth lock) — defer with setTimeout.
@@ -713,7 +736,7 @@ function exportWorkbook(filename, sheets){
   XLSX.writeFile(wb, filename);
   toast('Exported '+total+' rows in '+sheets.length+' sheets');
 }
-const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','Created','Notes'];
+const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','MAQINT FZC','Created','Notes'];
 function oppExportRow(o){
   const isOrder = o.pipelineStage==='order', isLead = o.pipelineStage==='lead';
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
@@ -721,7 +744,7 @@ function oppExportRow(o){
     (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', o.poDate?fmtDate(o.poDate):'',
     (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder?(o.paymentStatus||''):'',
     o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
-    o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
+    o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.maqintFzc?'Yes':'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
 }
 function toast(msg, ms=2200){
   const t = document.getElementById('toast');
@@ -984,6 +1007,7 @@ function renderSidebar(){
   <div class="sidebar ${navOpen?'open':''}">
     <div class="brand">${maqLogo(168)}</div>
     <div class="nav-item ${view==='dashboard'?'active':''}" data-nav="dashboard"><span class="nav-icon">${icon('dashboard',18)}</span> Dashboard</div>
+    <div class="nav-item ${view==='notifications'?'active':''}" data-nav="notifications"><span class="nav-icon">${icon('bell',18)}</span> Notifications${unreadCount()?` <span class="count-pill" style="margin-left:auto;background:var(--accent,#1f9bd7);color:#fff;">${unreadCount()}</span>`:''}</div>
     <div class="nav-group-label">Sales Pipeline</div>
     ${pipelineItems.filter(i=>i.id!=='archived' || canViewArchive()).map(navItem).join('')}
     <div class="nav-group-label">Records</div>
@@ -1013,6 +1037,7 @@ function renderView(){
     case 'principal-detail': return renderPrincipalDetail();
     case 'contacts': return renderContacts();
     case 'tasks': return renderTasks();
+    case 'notifications': return renderNotifications();
     case 'team': return renderTeam();
     default: return '';
   }
@@ -1174,6 +1199,8 @@ function viewToggle(board){
     <button class="dept-tab ${m==='list'?'active':''}" data-action="set-view-mode" data-board="${board}" data-mode="list" title="List view">${icon('menu',14)} List</button>
   </div>`;
 }
+// Small tag shown on records that belong to MAQINT FZC, our offshore company
+function fzcBadge(o){ return o.maqintFzc ? ' <span class="badge badge-purple" title="MAQINT FZC (offshore company)" style="vertical-align:middle;">FZC</span>' : ''; }
 function matchesSearch(o){
   const q = searchQuery.toLowerCase(); if(!q) return true;
   return [o.projectName, o.itemProduct, o.rfqNumber, o.opportunityNumber, o.oemReferenceNumber, customerName(o.customerId), oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):''].some(v=>(v||'').toLowerCase().includes(q));
@@ -1199,7 +1226,7 @@ function renderLeadsList(leads){
       <tbody>
         ${rows.length ? rows.map(o=>`
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.projectName||o.itemProduct||'Untitled Lead')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.itemProduct&&o.projectName?' · '+esc(o.itemProduct):''}</div></td>
+            <td><div>${esc(o.projectName||o.itemProduct||'Untitled Lead')}${fzcBadge(o)}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.itemProduct&&o.projectName?' · '+esc(o.itemProduct):''}</div></td>
             <td>${stage(o)}</td>
             <td>${esc((LEAD_SOURCES.find(s=>s.id===o.leadSource)||{}).label||'—')}</td>
             <td class="num">${o.leadScore??'—'}</td>
@@ -1225,7 +1252,7 @@ function renderRfqList(rfqs){
       <tbody>
         ${rows.length ? rows.map(o=>{ const f = followUpInfo(o); return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.projectName||o.itemProduct||'Untitled')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>
+            <td><div>${esc(o.projectName||o.itemProduct||'Untitled')}${fzcBadge(o)}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}</div></td>
             <td class="mono">${esc(o.rfqNumber||'—')}</td>
             <td>${esc(oppPrincipalNames(o)||'—')}</td>
             <td>${stage(o)}</td>
@@ -1255,7 +1282,7 @@ function renderLeads(){
         <div class="kanban-col-body" data-board="leads" data-col="${col.id}">
           ${cards.map(o=>`
             <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
-              <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled Lead')}</div>
+              <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled Lead')}${fzcBadge(o)}</div>
               <div class="kanban-card-sub">${esc(customerName(o.customerId))}${o.itemProduct?' · '+esc(o.itemProduct):''}</div>
               <div class="kanban-card-meta"><span>${o.leadSource?LEAD_SOURCES.find(s=>s.id===o.leadSource).label:''}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
             </div>`).join('')}
@@ -1285,7 +1312,7 @@ function renderOpportunities(){
         <div class="kanban-col-body" data-board="rfq" data-col="${col.id}">
           ${list.map(o=>`
             <div class="kanban-card" draggable="true" data-id="${o.id}" data-action="open-opportunity">
-              <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled')}</div>
+              <div class="kanban-card-title">${esc(o.projectName||o.itemProduct||'Untitled')}${fzcBadge(o)}</div>
               <div class="kanban-card-sub">${esc(customerName(o.customerId))} · RFQ# ${esc(o.rfqNumber||'—')}</div>
               ${o.opportunityNumber ? `<div class="kanban-card-sub mono">${esc(o.opportunityNumber)}</div>` : ''}
               ${o.poValue ? `<div class="kanban-card-sub" style="font-weight:600;color:var(--primary);">${esc(fmtMoney(o.poValue, o.currency))}</div>` : ''}
@@ -1335,6 +1362,35 @@ function renderLost(){
     </table>
   </div>
   `;
+}
+
+/* ---------------- Notifications ---------------- */
+const NOTIF_KINDS = {assigned:{label:'Assigned', badge:'badge-blue'}, status:{label:'Update', badge:'badge-purple'}, team:{label:'Team', badge:'badge-gray'}, due:{label:'Due', badge:'badge-red'}};
+function notifTime(ts){ const d=new Date(ts); return fmtDate(ts)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function renderNotifications(){
+  const list = state.notifications, unread = unreadCount();
+  const canPush = typeof Notification!=='undefined' && Notification.permission==='default';
+  const pushOn = typeof Notification!=='undefined' && Notification.permission==='granted';
+  return `
+  <div class="page-header">
+    <div><h1 class="page-title">Notifications</h1><div class="page-subtitle">${unread ? unread+' unread' : 'All caught up'} · assignments, status changes, your team's activity, and follow-ups and offers that are due</div></div>
+    <div class="header-actions">
+      ${canPush ? `<button class="btn btn-secondary" data-action="enable-desktop-alerts">Turn on desktop alerts</button>` : (pushOn ? `<span class="sub-text">Desktop alerts are on</span>` : '')}
+      ${unread ? `<button class="btn" data-action="mark-all-read">Mark all read</button>` : ''}
+    </div>
+  </div>
+  <div class="panel" style="padding:0;">
+    ${list.length ? list.map(n=>{ const k = NOTIF_KINDS[n.kind] || {label:'Note', badge:'badge-gray'}; return `
+      <div class="task-row" data-action="open-notification" data-id="${n.id}" style="display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);cursor:pointer;${n.readAt?'opacity:.65;':'background:rgba(31,155,215,.06);'}">
+        <span style="width:9px;height:9px;border-radius:50%;margin-top:7px;flex:none;background:${n.readAt?'transparent':'var(--accent,#1f9bd7)'};"></span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:${n.readAt?'500':'600'};overflow-wrap:anywhere;">${esc(n.title)}</div>
+          ${n.body ? `<div class="sub-text">${esc(n.body)}</div>` : ''}
+        </div>
+        <span class="badge ${k.badge}">${k.label}</span>
+        <span class="sub-text" style="white-space:nowrap;">${notifTime(n.createdAt)}</span>
+      </div>`; }).join('') : `<div class="sub-text" style="padding:34px;text-align:center;">No notifications yet. You will see assignments, status changes, team activity and due follow-ups here.</div>`}
+  </div>`;
 }
 
 /* ---------------- Archived ---------------- */
@@ -1403,7 +1459,7 @@ function renderOrders(){
           const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.itemProduct||o.projectName||'—')}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}${fzcBadge(o)}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
             <td class="mono">${esc(o.poNumber||'—')}</td>
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
             <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
@@ -1884,6 +1940,7 @@ function renderOpportunityForm(){
         <div class="field"><label>Assigned To</label><select name="assignedTo">${profileOptions(o.assignedTo)}</select></div>
         <div class="field"><label>Department</label><select name="department"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===o.department?'selected':''}>${d}</option>`).join('')}</select></div>
       </div>
+      <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" name="maqintFzc" id="maqintFzc" ${o.maqintFzc?'checked':''}><label for="maqintFzc" style="margin:0;">MAQINT FZC (our offshore company)</label></div>
 
       ${isLead ? `
       <div class="form-section-title">Lead</div>
@@ -2193,6 +2250,27 @@ function attachGlobalHandlers(){
   bind('open-principal', (el)=>{ modal={type:'principal-form', id:el.dataset.id}; render(); });
   bind('open-contact', (el)=>{ modal={type:'contact-form', id:el.dataset.id}; render(); });
   bind('open-opportunity', (el)=>{ modal={type:'opportunity-form', id:el.dataset.id}; render(); });
+  bind('open-notification', async (el)=>{
+    const n = state.notifications.find(x=>x.id===el.dataset.id); if(!n) return;
+    if(!n.readAt){
+      n.readAt = Date.now();
+      sb.from('notifications').update({read_at:new Date().toISOString()}).eq('id', n.id).then(()=>{}, ()=>{});
+    }
+    if(n.opportunityId && state.opportunities.some(o=>o.id===n.opportunityId)){ modal = {type:'opportunity-form', id:n.opportunityId}; }
+    else if(n.opportunityId){ toast('That record is no longer available to you'); }
+    render();
+  });
+  bind('mark-all-read', async ()=>{
+    const ids = state.notifications.filter(n=>!n.readAt).map(n=>n.id); if(!ids.length) return;
+    state.notifications.forEach(n=>{ if(!n.readAt) n.readAt = Date.now(); });
+    render();
+    const {error} = await sb.from('notifications').update({read_at:new Date().toISOString()}).in('id', ids);
+    if(error) toast('Could not save: '+error.message);
+  });
+  bind('enable-desktop-alerts', async ()=>{
+    try{ const r = await Notification.requestPermission(); toast(r==='granted' ? 'Desktop alerts are on' : 'Desktop alerts were not allowed'); }catch(e){}
+    render();
+  });
   bind('open-task', (el)=>{ modal={type:'task-form', id:el.dataset.id}; render(); });
 
   bind('close-modal', ()=>{ modal=null; render(); });
@@ -2362,6 +2440,7 @@ function attachGlobalHandlers(){
       // A new record belongs to whoever adds it, unless they pick someone else
       assigned_to: fd.get('assignedTo') || (!id && session && session.user ? session.user.id : null),
       department: fd.get('department')||null,
+      maqint_fzc: fd.get('maqintFzc')==='on',
       notes: fd.get('notes').trim()||null,
     };
     if(stage === 'lead'){
