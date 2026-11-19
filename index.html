@@ -1090,6 +1090,7 @@ function renderDashboard(){
         <div class="task-row" data-action="open-opportunity" data-id="${o.id}" style="cursor:pointer">
           <div class="task-title">${esc(o.projectName||o.itemProduct||'RFQ')}<div class="sub-text">${esc(customerName(o.customerId))}${o.followUpAction?' · '+esc(FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)?.label||''):''}${o.assignedTo?' · '+esc(profileName(o.assignedTo)):''}</div></div>
           <span class="badge ${f.badge}">${f.label}</span>
+          <button class="btn btn-secondary btn-sm" data-action="done-followup" data-id="${o.id}" title="Mark this follow-up done and log it">${icon('check',14)} Done</button>
         </div>`).join('') + (dueFollowUps.length>8?`<div class="sub-text">+${dueFollowUps.length-8} more on the RFQ board</div>`:'') : `<div class="sub-text">No follow-ups due 🎉</div>`}
       <div class="panel-title" style="margin-top:22px;">Orders — Action Needed</div>
       ${actionNeeded.length ? actionNeeded.map(o=>`
