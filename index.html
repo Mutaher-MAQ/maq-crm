@@ -862,6 +862,10 @@ function render(){
 // Hide every write control so the screens do not offer actions that would be refused.
 function applyReadOnly(){
   const me = currentProfile();
+  if(me && me.role==='employee'){
+    const a = document.getElementById('app');
+    if(a) a.querySelectorAll('[data-action="archive-opp"]').forEach(el=>{ el.style.display='none'; });
+  }
   if(!me || me.role!=='director') return;
   const app = document.getElementById('app'); if(!app) return;
   app.querySelectorAll('[data-action^="new-"],[data-action^="save-"],[data-action^="delete-"],[data-action="archive-opp"],[data-action="restore-opp"],[data-action="reopen-rfq"],[data-action="done-followup"],[data-action="advance-rfq"],[data-action="add-opportunity-activity"],[data-action="add-contact-activity"],[data-action="open-merge"],[data-action="run-merge"]').forEach(el=>{ el.style.display='none'; });
@@ -980,7 +984,7 @@ function renderSidebar(){
     <div class="brand">${maqLogo(168)}</div>
     <div class="nav-item ${view==='dashboard'?'active':''}" data-nav="dashboard"><span class="nav-icon">${icon('dashboard',18)}</span> Dashboard</div>
     <div class="nav-group-label">Sales Pipeline</div>
-    ${pipelineItems.map(navItem).join('')}
+    ${pipelineItems.filter(i=>i.id!=='archived' || canViewArchive()).map(navItem).join('')}
     <div class="nav-group-label">Records</div>
     ${otherItems.map(navItem).join('')}
     ${isAdmin ? `<div class="nav-group-label">Admin</div>${navItem({id:'team', icon:'team', label:'Team'})}` : ''}
@@ -1000,7 +1004,7 @@ function renderView(){
     case 'leads': return renderLeads();
     case 'opportunities': return renderOpportunities();
     case 'lost': return renderLost();
-    case 'archived': return renderArchived();
+    case 'archived': return canViewArchive() ? renderArchived() : renderDashboard();
     case 'orders': return renderOrders();
     case 'payments': return renderPayments();
     case 'customers': return renderCustomers();
@@ -1707,6 +1711,8 @@ function renderModal(){
 
 /* ---------------- Merge duplicates (admin only) ---------------- */
 function isAdmin(){ const me = currentProfile(); return !!me && me.role==='admin'; }
+// Employees cannot see archived records (the database enforces this too)
+function canViewArchive(){ const me = currentProfile(); return !(me && me.role==='employee'); }
 function nameSimilarity(a, b){
   const A = new Set(customerKey(a).split(' ').filter(Boolean)), B = new Set(customerKey(b).split(' ').filter(Boolean));
   if(!A.size || !B.size) return 0;
