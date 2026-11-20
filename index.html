@@ -779,6 +779,42 @@ function oppExportRow(o){
     o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
     o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.maqintFzc?'Yes':'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
 }
+/* Principal-specific Excel formats: some principals want updates on their own tracker sheet.
+   Add an entry here (match = part of the principal's name) to give that principal its own layout. */
+const PRINCIPAL_TEMPLATES = [
+  { match: /panametrics/i, label: 'Panametrics tracker', build: buildPanametricsTracker }
+];
+function principalTemplate(p){ return p ? PRINCIPAL_TEMPLATES.find(t=>t.match.test(p.name||'')) : null; }
+function buildPanametricsTracker(p){
+  const r = principalRecords(p.id);
+  // open RFQs, plus orders still waiting to ship
+  const list = [].concat(r.rfqs, r.orders.filter(o=>o.shipmentStatus!=='done'));
+  const stageOf = o => {
+    if(o.pipelineStage==='order') return 'Order Received';
+    return ({not_started:'Initial', in_progress:'Quotation Submission', offer_submitted:'Quotation Submitted', awaiting_response:'Quotation Submitted'})[o.rfqStatus] || 'Initial';
+  };
+  const amountOf = o => !o.poValue ? '-' : ((!o.currency || o.currency==='USD') ? Number(o.poValue) : `${o.currency} ${Number(o.poValue).toLocaleString('en-US')}`);
+  const customer = o => state.customers.find(c=>c.id===o.customerId);
+  const now = new Date();
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const aoa = [
+    ['Date ', fmtDate(now), null, null, 'Panametrics Tracker '+now.getFullYear()],
+    ['S.No','Client','Industry','Category','Product','Opportunity','Stage','Action Item / Status','Priority','Order expected','Year','Amount\nUSD $','DM No.']
+  ];
+  list.forEach((o,i)=>{
+    const c = customer(o);
+    aoa.push([i+1, c?c.name:'', (c&&c.industry)||'', '', o.itemProduct||'', o.projectName||'', stageOf(o), o.notes||'',
+      (PRIORITIES.find(x=>x.id===o.priority)||{}).label||'', '', '', amountOf(o), '']);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [6,30,20,18,26,49,24,60,14,14,9,17,17].map(w=>({wch:w}));
+  ws['!merges'] = [{s:{r:0,c:4}, e:{r:0,c:12}}];
+  ws['!autofilter'] = {ref: `B2:M${aoa.length}`};
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, `PanametricsTracker-${String(now.getDate()).padStart(2,'0')}${MON[now.getMonth()]}${now.getFullYear()}.xlsx`);
+  toast('Exported '+list.length+' row'+(list.length!==1?'s':'')+' in the Panametrics format');
+}
 function toast(msg, ms=2200){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1668,7 +1704,7 @@ function renderPrincipalDetail(){
     <div><button class="btn btn-secondary btn-sm" data-nav="principals" style="margin-bottom:8px;">← Back to Principals</button>
       <h1 class="page-title">${esc(p.name)}</h1>
       <div class="page-subtitle">Every lead, RFQ and order involving this principal that you are allowed to see</div></div>
-    <button class="btn" data-action="export-principal-all" data-id="${p.id}">${icon('download',15)} Export everything to Excel</button>
+    <div class="header-actions">${principalTemplate(p) ? `<button class="btn" data-action="export-principal-template" data-id="${p.id}">${icon('download',15)} Export ${esc(principalTemplate(p).label)}</button>` : ''}<button class="btn ${principalTemplate(p)?'btn-secondary':''}" data-action="export-principal-all" data-id="${p.id}">${icon('download',15)} Export everything to Excel</button></div>
   </div>
   <div class="stat-grid">
     ${tile('Leads', r.leads.length)}
@@ -2231,6 +2267,10 @@ function attachGlobalHandlers(){
     );
   });
   bind('view-principal', (el)=>{ principalDetailId = el.dataset.id; view='principal-detail'; searchQuery=''; enterView(); render(); window.scrollTo(0,0); });
+  bind('export-principal-template', (el)=>{
+    const p = state.principals.find(x=>x.id===el.dataset.id); const t = principalTemplate(p); if(!t) return;
+    t.build(p);
+  });
   bind('export-principal-all', (el)=>{
     const p = state.principals.find(x=>x.id===el.dataset.id); if(!p) return;
     const r = principalRecords(p.id);
