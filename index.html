@@ -785,7 +785,82 @@ const PRINCIPAL_TEMPLATES = [
   { match: /panametrics/i, label: 'Panametrics tracker', build: buildPanametricsTracker }
 ];
 function principalTemplate(p){ return p ? PRINCIPAL_TEMPLATES.find(t=>t.match.test(p.name||'')) : null; }
-function buildPanametricsTracker(p){
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = ()=>reject(new Error('Could not load '+src)); document.head.appendChild(s);
+  });
+}
+// Styled version (same look as Panametrics' own sheet: grey title/header bands, borders, big centred text, frozen header).
+// Uses ExcelJS, loaded only when needed; if it can't load (offline) we fall back to the plain version below.
+async function buildPanametricsTracker(p){
+  try{
+    if(typeof ExcelJS==='undefined') await loadScriptOnce('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js');
+  }catch(e){ toast('Styled export unavailable offline, exporting plain version'); return buildPanametricsPlain(p); }
+  const d = panametricsRows(p), now = new Date();
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Sheet1', {views:[{state:'frozen', ySplit:2, zoomScale:70}]});
+  ws.columns = [9,30,20,18,26,49,24,60,14,15,10,17,17].map(w=>({width:w}));
+  const GREY = {type:'pattern', pattern:'solid', fgColor:{argb:'FFAEAAAA'}};
+  const GREEN = {type:'pattern', pattern:'solid', fgColor:{argb:'FF92D050'}};
+  const thin = {style:'thin'}, med = {style:'medium'};
+  const box = (b)=>({top:b,left:b,bottom:b,right:b});
+  const ACCOUNTING = '_("$"* #,##0.00_);_("$"* \\(#,##0.00\\);_("$"* "-"??_);_(@_)';
+  // row 1: date + title
+  ws.getRow(1).height = 30;
+  ws.mergeCells('A1:B1'); ws.mergeCells('E1:M1');
+  ws.getCell('A1').value = 'Date ';
+  ws.getCell('C1').value = new Date(now.getFullYear(), now.getMonth(), now.getDate()); ws.getCell('C1').numFmt = 'dd/mm/yyyy';
+  ws.getCell('E1').value = 'Panametrics Tracker '+now.getFullYear();
+  for(let c=1;c<=13;c++){
+    const cell = ws.getCell(1,c);
+    cell.border = box(med);
+    if(c<=4){ cell.fill = GREY; cell.font = {name:'Calibri', size:16, bold:true}; }
+    else { cell.fill = GREY; cell.font = {name:'Calibri', size:20, bold:true}; }
+    cell.alignment = {horizontal:'center', vertical:'middle'};
+  }
+  // row 2: headers
+  const hdr = ws.getRow(2); hdr.height = 96;
+  d.headers.forEach((h,i)=>{
+    const cell = hdr.getCell(i+1); cell.value = h; cell.fill = GREY; cell.border = box(thin);
+    cell.font = {name:'Calibri', size:18, bold:true}; cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+  });
+  // data rows
+  d.rows.forEach((row,ri)=>{
+    const xr = ws.getRow(ri+3);
+    const lines = Math.max(1, Math.ceil(String(row[7]||'').length/45), Math.ceil(String(row[5]||'').length/36));
+    xr.height = Math.max(60, lines*21);
+    row.forEach((v,ci)=>{
+      const cell = xr.getCell(ci+1); cell.value = v===''?null:v; cell.border = box(thin);
+      cell.font = {name:'Calibri', size: ci===10?16:14};
+      cell.alignment = {horizontal: (ci===5||ci===7)?'left':'center', vertical:'middle', wrapText:true};
+      if(d.isOrder[ri]) cell.fill = GREEN;
+      if(ci===11 && typeof v==='number') cell.numFmt = ACCOUNTING;
+    });
+  });
+  ws.autoFilter = {from:'B2', to:'M'+(d.rows.length+2)};
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download = `PanametricsTracker-${String(now.getDate()).padStart(2,'0')}${MON[now.getMonth()]}${now.getFullYear()}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('Exported '+d.rows.length+' row'+(d.rows.length!==1?'s':'')+' in the Panametrics format');
+}
+function panametricsRows(p){
+  const r = principalRecords(p.id);
+  const list = [].concat(r.rfqs, r.orders.filter(o=>o.shipmentStatus!=='done'));
+  const stageOf = o => o.pipelineStage==='order' ? 'Order Received'
+    : (({not_started:'Initial', in_progress:'Quotation Submission', offer_submitted:'Quotation Submitted', awaiting_response:'Quotation Submitted'})[o.rfqStatus] || 'Initial');
+  const amountOf = o => !o.poValue ? '-' : ((!o.currency || o.currency==='USD') ? Number(o.poValue) : `${o.currency} ${Number(o.poValue).toLocaleString('en-US')}`);
+  const headers = ['S.No','Client','Industry','Category','Product','Opportunity','Stage','Action Item / Status','Priority','Order expected','Year','Amount\nUSD $','DM No.'];
+  const rows = list.map((o,i)=>{
+    const c = state.customers.find(x=>x.id===o.customerId);
+    return [i+1, c?c.name:'', (c&&c.industry)||'', '', o.itemProduct||'', o.projectName||'', stageOf(o), o.notes||'',
+      (PRIORITIES.find(x=>x.id===o.priority)||{}).label||'', '', '', amountOf(o), ''];
+  });
+  return {headers, rows, isOrder: list.map(o=>o.pipelineStage==='order')};
+}
+function buildPanametricsPlain(p){
   const r = principalRecords(p.id);
   // open RFQs, plus orders still waiting to ship
   const list = [].concat(r.rfqs, r.orders.filter(o=>o.shipmentStatus!=='done'));
