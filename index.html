@@ -769,7 +769,7 @@ function exportWorkbook(filename, sheets){
   XLSX.writeFile(wb, filename);
   toast('Exported '+total+' rows in '+sheets.length+' sheets');
 }
-const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','MAQINT FZC','Created','Notes'];
+const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','Principal Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','MAQINT FZC','Created','Notes'];
 function oppExportRow(o){
   const isOrder = o.pipelineStage==='order', isLead = o.pipelineStage==='lead';
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
@@ -1237,8 +1237,8 @@ function viewToggle(board){
     <button class="dept-tab ${m==='list'?'active':''}" data-action="set-view-mode" data-board="${board}" data-mode="list" title="List view">${icon('menu',14)} List</button>
   </div>`;
 }
-// Small tag shown on records that belong to MAQINT FZC, our offshore company
-function fzcBadge(o){ return o.maqintFzc ? ' <span class="badge badge-purple" title="MAQINT FZC (offshore company)" style="vertical-align:middle;">FZC</span>' : ''; }
+// Small tag shown on records that belong to MAQINT FZC
+function fzcBadge(o){ return o.maqintFzc ? ' <span class="badge badge-purple" title="MAQINT FZC" style="vertical-align:middle;">FZC</span>' : ''; }
 // Filter by company: everything, MAQINT FZC only, or everything except MAQINT FZC
 let fzcFilter = '';
 function passFzc(o){ return !fzcFilter || (fzcFilter==='fzc' ? !!o.maqintFzc : !o.maqintFzc); }
@@ -2017,7 +2017,7 @@ function renderOpportunityForm(){
         <div class="field"><label>Assigned To</label><select name="assignedTo">${profileOptions(o.assignedTo)}</select></div>
         <div class="field"><label>Department</label><select name="department"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===o.department?'selected':''}>${d}</option>`).join('')}</select></div>
       </div>
-      <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" name="maqintFzc" id="maqintFzc" ${o.maqintFzc?'checked':''}><label for="maqintFzc" style="margin:0;">MAQINT FZC (our offshore company)</label></div>
+      <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" name="maqintFzc" id="maqintFzc" ${o.maqintFzc?'checked':''}><label for="maqintFzc" style="margin:0;">MAQINT FZC</label></div>
 
       ${isLead ? `
       <div class="form-section-title">Lead</div>
@@ -2035,7 +2035,7 @@ function renderOpportunityForm(){
       <div class="field"><label>Principal (OEM)</label><select name="principalIds">${principalOptions(selectedPrincipals[0])}</select></div>
       <div class="field-row">
         <div class="field"><label>RFQ #</label><input name="rfqNumber" value="${esc(o.rfqNumber)}"></div>
-        <div class="field"><label>OEM Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
+        <div class="field"><label>Principal Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
       </div>
       <div class="field"><label>RFQ Date</label><input name="rfqDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${rfqDateVal}">
         <div class="checkbox-row"><input type="checkbox" name="rfqDateEstimated" id="rfqDateEstimated" ${o.rfqDateEstimated?'checked':''}><label for="rfqDateEstimated" style="margin:0;">Estimated / expected date</label></div>
@@ -2149,7 +2149,7 @@ function attachGlobalHandlers(){
   });
   bind('export-rfqs', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='rfq').sort((a,b)=>b.createdAt-a.createdAt);
-    exportToExcel('rfqs.xlsx', ['Opportunity #','Customer','Project','Item/Product','RFQ #','OEM Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
+    exportToExcel('rfqs.xlsx', ['Opportunity #','Customer','Project','Item/Product','RFQ #','Principal Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
       rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', (RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'', (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label||'', o.winLose||'', o.loseReason||'', oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
   });
   bind('export-payments', ()=>{
