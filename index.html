@@ -137,6 +137,9 @@
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .checkbox-row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--muted);}
   .form-section-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin:22px 0 12px;padding-top:16px;border-top:1px solid var(--border);}
+  .field-missing input,.field-missing select{border-color:#e0912a !important;background:#fff8ec !important;}
+  .field-missing > label::after{content:" — needed";color:#c2710c;font-weight:600;}
+  .po-banner{background:#fff4e0;border:1px solid #f0c27a;color:#7a4a05;border-radius:10px;padding:10px 12px;font-size:13px;margin:0 0 12px;}
   .form-section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
 
   .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
@@ -743,6 +746,10 @@ function lcStatusInfo(id){ return LC_STATUSES.find(x=>x.id===id) || LC_STATUSES[
 // Payment terms decide the letter of credit: only LC orders have an LC to open (pending until opened).
 // CAD, Advance and orders with no terms yet have no LC status.
 function lcEffective(o){ return o.paymentTerms==='LC' ? (o.lcStatus==='done' ? 'done' : 'pending') : 'not_applicable'; }
+// PO details an order needs once an RFQ is won (CTR # and Job # usually come later, so they are not required)
+const PO_REQUIRED = [['poNumber','PO #'],['poDate','PO Date'],['currency','Currency'],['poValue','PO Value'],['paymentTerms','Payment Terms']];
+function poMissing(o){ return PO_REQUIRED.filter(([k])=>!o[k]).map(([,label])=>label); }
+function poMissingBadge(o){ const m = poMissing(o); return m.length ? ` <span class="badge badge-amber" title="Missing: ${esc(m.join(', '))}">PO details missing</span>` : ''; }
 function simpleStatusInfo(id){ return SIMPLE_STATUSES.find(x=>x.id===id) || SIMPLE_STATUSES[0]; }
 // Count only the opportunities this person is allowed to see (never other people's)
 function linkedOppCount(principalId){ const mine = new Set(state.opportunities.map(o=>o.id)); return state.opportunityPrincipals.filter(x=>x.principalId===principalId && mine.has(x.opportunityId)).length; }
@@ -1614,7 +1621,7 @@ function renderOrders(){
           const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
-            <td><div>${esc(o.itemProduct||o.projectName||'—')}${fzcBadge(o)}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
+            <td><div>${esc(o.itemProduct||o.projectName||'—')}${fzcBadge(o)}${poMissingBadge(o)}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
             <td class="mono">${esc(o.poNumber||'—')}</td>
             <td class="mono">${esc(o.ctrNumber||'—')}</td>
             <td><div class="name-cell">${o.poPrincipalId ? logoChip(principalName(o.poPrincipalId), (state.principals.find(x=>x.id===o.poPrincipalId)||{}).logoUrl, 'sm') : ''}<span>${esc(principalName(o.poPrincipalId))}</span></div></td>
@@ -1647,6 +1654,7 @@ function renderOrdersBoard(rows){
               <div class="kanban-card-title">${esc(customerName(o.customerId))}${fzcBadge(o)}</div>
               <div class="kanban-card-sub">${esc(o.itemProduct||o.projectName||'—')}</div>
               <div class="kanban-card-sub">PO# ${esc(o.poNumber||'—')}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div>
+              ${poMissing(o).length ? `<div style="margin:2px 0;">${poMissingBadge(o)}</div>` : ''}
               ${o.poValue ? `<div class="kanban-card-title" style="color:var(--primary)">${esc(fmtMoney(o.poValue, o.currency))}</div>` : ''}
               <div class="kanban-card-meta"><span>${o.paymentTerms ? `<span class="badge badge-gray">${esc(o.paymentTerms)}</span>` : '<span class="badge badge-amber">Terms?</span>'}</span><span>${o.assignedTo?esc(profileName(o.assignedTo)):''}</span></div>
             </div>`).join('')}
@@ -2116,6 +2124,13 @@ function renderOpportunityForm(){
   const acts = editing ? state.activities.filter(a=>a.opportunityId===editing.id).sort((a,b)=>b.timestamp-a.timestamp) : [];
   const isLead = o.pipelineStage === 'lead';
   const isOrder = o.pipelineStage === 'order';
+  // Just won: the PO details are required. On any other order, missing ones are highlighted.
+  const poForced = isOrder && !!modal.poRequired;
+  const poGaps = isOrder ? poMissing(o) : [];
+  const gapKeys = new Set(PO_REQUIRED.filter(([k])=>!o[k]).map(([k])=>k));
+  const gap = k => (isOrder && gapKeys.has(k)) ? 'field-missing' : '';
+  const req = poForced ? 'required' : '';
+  const star = poForced ? ' *' : '';
 
   return modalShell(editing?'Edit '+(isLead?'Lead':(isOrder?'Order':'Opportunity')):(isLead?'New Lead':'New Opportunity'), `
     <form id="opportunity-form" data-stage="${o.pipelineStage}">
@@ -2173,18 +2188,20 @@ function renderOpportunityForm(){
 
       ${isOrder ? `
       <div class="form-section-title">Purchase Order</div>
-      <div class="field-row"><div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div><div class="field"><label>PO #</label><input name="poNumber" value="${esc(o.poNumber)}"></div></div>
+      ${poForced ? `<div class="po-banner"><b>Won!</b> Add the PO details to finish. The fields marked * are required. If you close this now, the order stays flagged "PO details missing" until they are filled in.</div>`
+        : (poGaps.length ? `<div class="po-banner">PO details still needed: ${esc(poGaps.join(', '))}</div>` : '')}
+      <div class="field-row"><div class="field"><label>CTR #</label><input name="ctrNumber" value="${esc(o.ctrNumber)}"></div><div class="field ${gap('poNumber')}"><label>PO #${star}</label><input name="poNumber" ${req} value="${esc(o.poNumber)}"></div></div>
       <div class="field-row"><div class="field"><label>Job Number</label><input name="jobNumber" value="${esc(o.jobNumber)}"></div><div class="field"></div></div>
-      <div class="field"><label>PO Date</label><input name="poDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${poDateVal}">
+      <div class="field ${gap('poDate')}"><label>PO Date${star}</label><input name="poDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" ${req} value="${poDateVal}">
         <div class="checkbox-row"><input type="checkbox" name="poDateEstimated" id="poDateEstimated" ${o.poDateEstimated?'checked':''}><label for="poDateEstimated" style="margin:0;">Estimated / expected date</label></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Currency</label><select name="currency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
-        <div class="field"><label>PO Value</label><input name="poValue" type="number" min="0" step="0.01" value="${esc(o.poValue)}"></div>
+        <div class="field ${gap('currency')}"><label>Currency${star}</label><select name="currency" ${req}><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="field ${gap('poValue')}"><label>PO Value${star}</label><input name="poValue" type="number" min="0" step="0.01" ${req} value="${esc(o.poValue)}"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Payment Terms</label><select name="paymentTerms" data-action="lc-auto"><option value="">—</option>${PAYMENT_TERMS.map(t=>`<option value="${t}" ${t===o.paymentTerms?'selected':''}>${t}</option>`).join('')}</select></div>
-        <div class="field"><label>PO Principal</label><select name="poPrincipalId">${principalOptions(o.poPrincipalId)}</select></div>
+        <div class="field ${gap('paymentTerms')}"><label>Payment Terms${star}</label><select name="paymentTerms" data-action="lc-auto" ${req}><option value="">—</option>${PAYMENT_TERMS.map(t=>`<option value="${t}" ${t===o.paymentTerms?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>PO Principal</label><select name="poPrincipalId">${principalOptions(o.poPrincipalId || (poForced ? selectedPrincipals[0] : ''))}</select></div>
       </div>
       <div class="field-row">
         <div class="field" id="lc-field" style="${o.paymentTerms==='LC' ? '' : 'display:none;'}"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.filter(s=>s.id!=='not_applicable').map(s=>`<option value="${s.id}" ${s.id===lcEffective({paymentTerms:'LC',lcStatus:o.lcStatus})?'selected':''}>${s.id==='done' ? 'Opened' : 'Pending'}</option>`).join('')}</select></div>
@@ -2249,7 +2266,7 @@ function attachGlobalHandlers(){
   bind('new-contact', ()=>{ modal={type:'contact-form', id:null}; render(); });
   bind('new-opportunity', ()=>{ modal={type:'opportunity-form', id:null, startStage:'rfq'}; render(); });
   bind('new-lead', ()=>{ modal={type:'opportunity-form', id:null, startStage:'lead'}; render(); });
-  bind('new-order', ()=>{ modal={type:'opportunity-form', id:null, startStage:'order'}; render(); });
+  bind('new-order', ()=>{ modal={type:'opportunity-form', id:null, startStage:'order', poRequired:true}; render(); });
   bind('new-task', ()=>{ modal={type:'task-form', id:null}; render(); });
 
   bind('dept-filter', (el)=>{ deptFilter = el.dataset.dept || ''; render(); });
@@ -2697,6 +2714,8 @@ function attachGlobalHandlers(){
       await reloadOpportunityPrincipals();
     }
 
+    // Just won: keep the form open on the order so the PO details are filled in right away
+    if(payload.pipeline_stage==='order' && stage!=='order'){ modal={type:'opportunity-form', id:savedOpp.id, poRequired:true}; render(); toast('Won! Add the PO details'); return; }
     modal=null; render(); toast(payload.pipeline_stage==='order' && stage!=='order' ? 'Won! Moved to Orders & POs' : (payload.pipeline_stage==='rfq' && stage==='lead' ? 'Qualified! Moved to RFQs' : 'Saved'));
   }));
 
@@ -2744,7 +2763,10 @@ function attachGlobalHandlers(){
       render();
       const {data, error} = await sb.from('opportunities').update(payload).eq('id', dragCardId).select().single();
       if(error){ toast('Error: '+error.message); return; }
-      upsertLocal('opportunities', mapOpportunityFromDb(data)); render();
+      upsertLocal('opportunities', mapOpportunityFromDb(data));
+      // Dropped on Won: open the new order so the PO details are filled in right away
+      if(board==='rfq' && colId==='won' && data.pipeline_stage==='order'){ modal={type:'opportunity-form', id:data.id, poRequired:true}; toast('Won! Add the PO details'); }
+      render();
     });
   });
 }
