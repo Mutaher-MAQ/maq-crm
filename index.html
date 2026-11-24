@@ -478,7 +478,7 @@ function myDepartments(){
 }
 let deptFilter = '';
 function mapCustomerFromDb(r){ return {id:r.id, name:r.name, industry:r.industry||'', website:r.website||'', notes:r.notes||''}; }
-function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||'', logoUrl:r.logo_url||''}; }
+function mapPrincipalFromDb(r){ return {id:r.id, name:r.name, notes:r.notes||'', logoUrl:r.logo_url||'', businessType:r.business_type||'product'}; }
 function mapContactFromDb(r){ return {id:r.id, name:r.name, email:r.email||'', phone:r.phone||'', title:r.title||'', customerId:r.customer_id||'', notes:r.notes||'', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
 function mapTaskFromDb(r){ return {id:r.id, title:r.title, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, done:!!r.done, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', notes:r.notes||''}; }
 function mapActivityFromDb(r){ return {id:r.id, contactId:r.contact_id||'', opportunityId:r.opportunity_id||'', type:r.type, note:r.note, timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()}; }
@@ -487,7 +487,7 @@ function mapOpportunityFromDb(r){
     id:r.id, pipelineStage:r.pipeline_stage||'rfq', department:r.department||'', archived:!!r.archived, archivedAt: r.archived_at ? new Date(r.archived_at).getTime() : null,
     customerId:r.customer_id||'', projectName:r.project_name||'', itemProduct:r.item_product||'', assignedTo:r.assigned_to||'',
     leadStatus:r.lead_status||'to_do', leadSource:r.lead_source||'', leadScore:r.lead_score,
-    opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'', expectedQuarter:r.expected_quarter||'', expectedYear:r.expected_year||'',
+    opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'', expectedQuarter:r.expected_quarter||'', expectedYear:r.expected_year||'', serviceLine:r.service_line||'',
     rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
     followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:(r.rfq_status==='awaiting_response' ? 'offer_submitted' : r.rfq_status)||'not_started',
@@ -745,7 +745,17 @@ function winLoseInfo(id){ return WIN_LOSE.find(x=>x.id===id) || WIN_LOSE[0]; }
 function lcStatusInfo(id){ return LC_STATUSES.find(x=>x.id===id) || LC_STATUSES[1]; }
 // Payment terms decide the letter of credit: only LC orders have an LC to open (pending until opened).
 // CAD, Advance and orders with no terms yet have no LC status.
-function lcEffective(o){ return o.paymentTerms==='LC' ? (o.lcStatus==='done' ? 'done' : 'pending') : 'not_applicable'; }
+function lcEffective(o){ return (o.paymentTerms==='LC' && !isServiceOpp(o)) ? (o.lcStatus==='done' ? 'done' : 'pending') : 'not_applicable'; }
+// Service principals (e.g. Bureau Veritas): no goods, so no shipment or LC. Delivery is Pending / In Progress / Completed.
+const SERVICE_STATUSES = [
+  {id:'pending', label:'Pending', badge:'badge-amber'},
+  {id:'in_progress', label:'In Progress', badge:'badge-blue'},
+  {id:'done', label:'Completed', badge:'badge-green'},
+];
+const SERVICE_LINES = ['Certification','Industry','B&I','AFC','Technical Centre','Sustainability','Cybersecurity','Training','Testing & Calibration','Inspection'];
+function principalIsService(pid){ const p = state.principals.find(x=>x.id===pid); return !!p && p.businessType==='service'; }
+function isServiceOpp(o){ return !!o && (principalIsService(o.poPrincipalId) || (o.id ? opportunityPrincipalIds(o.id).some(principalIsService) : false)); }
+function deliveryInfo(o){ const list = isServiceOpp(o) ? SERVICE_STATUSES : SIMPLE_STATUSES; return list.find(x=>x.id===o.shipmentStatus) || list[0]; }
 // PO details an order needs once an RFQ is won (CTR # and Job # usually come later, so they are not required)
 const PO_REQUIRED = [['poNumber','PO #'],['poDate','PO Date'],['currency','Currency'],['poValue','PO Value'],['paymentTerms','Payment Terms']];
 function poMissing(o){ return PO_REQUIRED.filter(([k])=>!o[k]).map(([,label])=>label); }
@@ -783,7 +793,7 @@ function oppExportRow(o){
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
   return [o.opportunityNumber||'', isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
     (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', o.poDate?fmtDate(o.poDate):'',
-    (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder&&canSeePayments()?(o.paymentStatus||''):'',
+    (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?deliveryInfo(o).label:'', isOrder&&canSeePayments()?(o.paymentStatus||''):'',
     o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', expectedCloseText(o), o.winLose||'', o.loseReason||'',
     o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.maqintFzc?'Yes':'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
 }
@@ -820,7 +830,7 @@ async function buildBureauVeritasTracker(p){
   const rows = list.map((o,i)=>{
     const notes = o.notes||'';
     const structured = /^Source: BV tracker row/m.test(notes);
-    const line = (/^Bureau Veritas\s*-\s*(.+)$/i.exec(o.projectName||'')||[])[1] || '';
+    const line = o.serviceLine || (/^Bureau Veritas\s*-\s*(.+)$/i.exec(o.projectName||'')||[])[1] || '';
     const lastAct = state.activities.filter(a=>a.opportunityId===o.id).sort((a,b)=>b.timestamp-a.timestamp)[0];
     return [
       i+1, excelDay(o.rfqDate||o.createdAt||Date.now()), customerName(o.customerId)==='—'?'':customerName(o.customerId), o.itemProduct||o.projectName||'',
@@ -1325,7 +1335,7 @@ function renderDashboard(){
           <div class="task-title">${esc(o.projectName||o.itemProduct||'Order')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
           ${!o.paymentTerms ? '<span class="badge badge-amber">Payment terms?</span>' : ''}
           ${lcEffective(o)==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
-          ${o.shipmentStatus==='pending' ? '<span class="badge badge-amber">Shipment pending</span>' : ''}
+          ${o.shipmentStatus==='pending' ? `<span class="badge badge-amber">${isServiceOpp(o)?'Delivery pending':'Shipment pending'}</span>` : ''}
         </div>`).join('') : `<div class="sub-text">Nothing pending — all orders are clear 🎉</div>`}
     </div>
     <div class="panel">
@@ -1689,10 +1699,10 @@ function renderOrders(){
   <div class="toolbar"><div class="search-box"><input type="text" placeholder="Search orders..." value="${esc(searchQuery)}" data-action="search"></div>${fzcSelect()}<button class="btn btn-secondary" data-action="export-orders">${icon('download',15)} Export to Excel</button></div>
   ${boardMode.orders==='board' ? renderOrdersBoard(rows) : `<div class="panel" style="padding:0;overflow-x:auto;">
     <table>
-      <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>Payment Terms</th><th>Shipment</th><th>Assigned</th><th></th></tr></thead>
+      <thead><tr><th>Customer / Item</th><th>PO #</th><th>CTR #</th><th>Principal</th><th>PO Value</th><th>Payment Terms</th><th>Shipment / Delivery</th><th>Assigned</th><th></th></tr></thead>
       <tbody>
         ${rows.length ? rows.map(o=>{
-          const lc = lcStatusInfo(lcEffective(o)); const sh = simpleStatusInfo(o.shipmentStatus);
+          const lc = lcStatusInfo(lcEffective(o)); const sh = deliveryInfo(o);
           return `
           <tr data-action="open-opportunity" data-id="${o.id}">
             <td><div>${esc(o.itemProduct||o.projectName||'—')}${fzcBadge(o)}${poMissingBadge(o)}</div><div class="sub-text">${esc(customerName(o.customerId))}${o.opportunityNumber?' · '+esc(o.opportunityNumber):''}${o.jobNumber?' · Job '+esc(o.jobNumber):''}</div></td>
@@ -1716,9 +1726,17 @@ const SHIPMENT_COLUMNS = [
   {id:'pending', label:'Shipment Pending', color:'#e0912a'},
   {id:'done', label:'Shipment Done', color:'#16a34a'},
 ];
+// Service orders (e.g. Bureau Veritas) use Pending / In Progress / Completed; the In Progress column only appears when such orders exist.
+const SERVICE_COLUMNS = [
+  {id:'pending', label:'Delivery Pending', color:'#e0912a'},
+  {id:'in_progress', label:'In Progress', color:'#2563eb'},
+  {id:'done', label:'Completed', color:'#16a34a'},
+];
 function renderOrdersBoard(rows){
+  const hasService = rows.some(isServiceOpp);
+  const cols = hasService ? SERVICE_COLUMNS : SHIPMENT_COLUMNS;
   return `<div class="kanban">
-    ${SHIPMENT_COLUMNS.map(col=>{
+    ${cols.map(col=>{
       const cards = rows.filter(o=>(o.shipmentStatus||'pending')===col.id);
       return `<div class="kanban-col" style="--col:${col.color}">
         <div class="kanban-col-header"><span>${col.label} <span class="count-pill">${cards.length}</span></span></div>
@@ -2121,7 +2139,7 @@ function renderCustomerForm(){
 
 function renderPrincipalForm(){
   const editing = modal.id ? state.principals.find(p=>p.id===modal.id) : null;
-  const p = editing || {name:'',notes:'',logoUrl:''};
+  const p = editing || {name:'',notes:'',logoUrl:'',businessType:'product'};
   const relatedOpps = editing ? state.opportunities.filter(o=>opportunityPrincipalIds(o.id).includes(editing.id)) : [];
   return modalShell(editing?'Edit Principal':'New Principal', `
     <form id="principal-form">
@@ -2129,6 +2147,7 @@ function renderPrincipalForm(){
       <div class="field"><label>Logo (image URL or path)</label>
         <div style="display:flex;gap:12px;align-items:center;">${logoChip(p.name||'New', p.logoUrl)}<input name="logoUrl" value="${esc(p.logoUrl||'')}" placeholder="logos/example.png or https://…"></div>
       </div>
+      <div class="field"><label>Business Type</label><select name="businessType"><option value="product" ${p.businessType!=='service'?'selected':''}>Product (goods, shipment, LC)</option><option value="service" ${p.businessType==='service'?'selected':''}>Service (scope, service line, delivery status)</option></select></div>
       <div class="field"><label>Notes</label><textarea name="notes" rows="3">${esc(p.notes)}</textarea></div>
     </form>
     ${editing && relatedOpps.length ? `<div class="detail-section"><div class="detail-label">Linked Opportunities</div>${relatedOpps.map(o=>`<div class="sub-text" style="margin-bottom:4px">${esc(o.projectName||'Untitled')} — ${esc(customerName(o.customerId))}</div>`).join('')}</div>` : ''}
@@ -2205,14 +2224,17 @@ function renderOpportunityForm(){
   const gap = k => (isOrder && gapKeys.has(k)) ? 'field-missing' : '';
   const req = poForced ? 'required' : '';
   const star = poForced ? ' *' : '';
+  // Service principals (e.g. Bureau Veritas): Service / Scope, Service Line, delivery status, no LC.
+  const svc = modal.serviceForced !== undefined ? modal.serviceForced : isServiceOpp(o);
 
   return modalShell(editing?'Edit '+(isLead?'Lead':(isOrder?'Order':'Opportunity')):(isLead?'New Lead':'New Opportunity'), `
     <form id="opportunity-form" data-stage="${o.pipelineStage}">
       <div class="field"><label>Customer</label><select name="customerId">${customerOptions(o.customerId)}</select></div>
       <div class="field-row">
         <div class="field"><label>Project / Description</label><input name="projectName" value="${esc(o.projectName)}"></div>
-        <div class="field"><label>Item / Product</label><input name="itemProduct" value="${esc(o.itemProduct)}"></div>
+        <div class="field"><label>${svc?'Service / Scope':'Item / Product'}</label><input name="itemProduct" value="${esc(o.itemProduct)}"></div>
       </div>
+      ${svc ? `<div class="field"><label>Service Line</label><input name="serviceLine" list="service-lines" placeholder="e.g. Certification, Industry, B&amp;I" value="${esc(o.serviceLine)}"><datalist id="service-lines">${SERVICE_LINES.map(l=>`<option value="${esc(l)}"></option>`).join('')}</datalist></div>` : ''}
       <div class="field-row">
         <div class="field"><label>Assigned To</label><select name="assignedTo">${profileOptions(o.assignedTo)}</select></div>
         <div class="field"><label>Department</label><select name="department"><option value="">—</option>${DEPARTMENTS.map(d=>`<option value="${d}" ${d===o.department?'selected':''}>${d}</option>`).join('')}</select></div>
@@ -2232,7 +2254,7 @@ function renderOpportunityForm(){
         <div class="field"><label>Opportunity Type</label><select name="opportunityType"><option value="">—</option>${OPPORTUNITY_TYPES.map(t=>`<option value="${t.id}" ${t.id===o.opportunityType?'selected':''}>${t.label}</option>`).join('')}</select></div>
         <div class="field"><label>CRM Reference Number</label><input value="${esc(o.opportunityNumber||'Assigned when saved')}" readonly style="background:var(--bg,#f4f6fa);color:#5d6b82;"></div>
       </div>
-      <div class="field"><label>Principal (OEM)</label><select name="principalIds">${principalOptions(selectedPrincipals[0])}</select></div>
+      <div class="field"><label>Principal (OEM)</label><select name="principalIds" data-action="svc-check">${principalOptions(selectedPrincipals[0])}</select></div>
       <div class="field-row">
         <div class="field"><label>RFQ #</label><input name="rfqNumber" value="${esc(o.rfqNumber)}"></div>
         <div class="field"><label>Principal Reference Number</label><input name="oemReferenceNumber" value="${esc(o.oemReferenceNumber)}"></div>
@@ -2279,11 +2301,11 @@ function renderOpportunityForm(){
       </div>
       <div class="field-row">
         <div class="field ${gap('paymentTerms')}"><label>Payment Terms${star}</label><select name="paymentTerms" data-action="lc-auto" ${req}><option value="">—</option>${PAYMENT_TERMS.map(t=>`<option value="${t}" ${t===o.paymentTerms?'selected':''}>${t}</option>`).join('')}</select></div>
-        <div class="field"><label>PO Principal</label><select name="poPrincipalId">${principalOptions(o.poPrincipalId || (poForced ? selectedPrincipals[0] : ''))}</select></div>
+        <div class="field"><label>PO Principal</label><select name="poPrincipalId" data-action="svc-check">${principalOptions(o.poPrincipalId || (poForced ? selectedPrincipals[0] : ''))}</select></div>
       </div>
       <div class="field-row">
-        <div class="field" id="lc-field" style="${o.paymentTerms==='LC' ? '' : 'display:none;'}"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.filter(s=>s.id!=='not_applicable').map(s=>`<option value="${s.id}" ${s.id===lcEffective({paymentTerms:'LC',lcStatus:o.lcStatus})?'selected':''}>${s.id==='done' ? 'Opened' : 'Pending'}</option>`).join('')}</select></div>
-        <div class="field"><label>Shipment Status</label><select name="shipmentStatus">${SIMPLE_STATUSES.map(s=>`<option value="${s.id}" ${s.id===o.shipmentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
+        ${svc ? '' : `<div class="field" id="lc-field" style="${o.paymentTerms==='LC' ? '' : 'display:none;'}"><label>LC Status</label><select name="lcStatus">${LC_STATUSES.filter(s=>s.id!=='not_applicable').map(s=>`<option value="${s.id}" ${s.id===lcEffective({paymentTerms:'LC',lcStatus:o.lcStatus})?'selected':''}>${s.id==='done' ? 'Opened' : 'Pending'}</option>`).join('')}</select></div>`}
+        <div class="field"><label>${svc?'Service Delivery':'Shipment Status'}</label><select name="shipmentStatus">${(svc?SERVICE_STATUSES:SIMPLE_STATUSES).map(s=>`<option value="${s.id}" ${s.id===o.shipmentStatus?'selected':''}>${s.label}</option>`).join('')}</select></div>
       </div>
 
       ${canSeePayments() ? `<div class="form-section-title">Payment / Commission</div>
@@ -2361,7 +2383,7 @@ function attachGlobalHandlers(){
   bind('export-payments', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
     exportToExcel('payments.xlsx', ['Customer','Item/Product','PO #','CTR #','Job #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment','Payment Status','Commission Status','Commission Rate','Owner','Department'],
-      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
+      rows.map(o=>[customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, deliveryInfo(o).label, o.paymentStatus||'', o.commissionStatus||'', o.commissionRate??'', o.assignedTo?profileName(o.assignedTo):'', o.department||'']));
   });
   bind('export-tasks', ()=>{
     exportToExcel('tasks.xlsx', ['Task','Due','Done','Related Contact','Related Record','Notes'],
@@ -2417,7 +2439,7 @@ function attachGlobalHandlers(){
     const rows = orderRows();
     exportToExcel('orders.xlsx',
       ['CRM Ref #','Customer','Item/Product','PO #','CTR #','Job #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
-      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, canSeePayments()?(o.paymentStatus||''):'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
+      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, deliveryInfo(o).label, canSeePayments()?(o.paymentStatus||''):'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
     );
   });
   bind('export-customers', ()=>{
@@ -2568,6 +2590,14 @@ function attachGlobalHandlers(){
     const field = form.querySelector('#lc-field');
     if(field) field.style.display = form.elements.paymentTerms.value==='LC' ? '' : 'none';
   }, 'change');
+  // Picking a service principal (e.g. Bureau Veritas) switches the form to service wording and hides LC.
+  bind('svc-check', (el)=>{
+    const form = el.closest('form'); if(!form || !modal) return;
+    const ids = [form.elements.principalIds && form.elements.principalIds.value, form.elements.poPrincipalId && form.elements.poPrincipalId.value].filter(Boolean);
+    const svc = ids.some(principalIsService);
+    const cur = modal.serviceForced !== undefined ? modal.serviceForced : isServiceOpp(modal.id ? state.opportunities.find(x=>x.id===modal.id) : null);
+    if(svc !== cur){ modal.serviceForced = svc; render(); }
+  }, 'change');
   bind('show-alerts', ()=>{ modal={type:'alerts'}; render(); });
 
   bind('promote-lead', async (el)=>{
@@ -2678,7 +2708,7 @@ function attachGlobalHandlers(){
     if(!form.reportValidity()) return;
     const fd = new FormData(form);
     const id = el.dataset.id;
-    const payload = {name:fd.get('name').trim(), notes:fd.get('notes').trim()||null, logo_url:(fd.get('logoUrl')||'').trim()||null};
+    const payload = {name:fd.get('name').trim(), notes:fd.get('notes').trim()||null, logo_url:(fd.get('logoUrl')||'').trim()||null, business_type:fd.get('businessType')==='service'?'service':'product'};
     const twin = state.principals.find(p=>p.id!==id && customerKey(p.name)===customerKey(payload.name));
     if(twin){ toast(`"${twin.name}" already exists. Use that principal instead of adding "${payload.name}".`, 7000); return; }
     const q = id ? sb.from('principals').update(payload).eq('id', id) : sb.from('principals').insert(payload);
@@ -2731,6 +2761,7 @@ function attachGlobalHandlers(){
       maqint_fzc: fd.get('maqintFzc')==='on',
       notes: fd.get('notes').trim()||null,
     };
+    if(fd.has('serviceLine')) payload.service_line = (fd.get('serviceLine')||'').trim()||null;   // only present on service principals
     if(stage === 'lead'){
       payload.lead_source = fd.get('leadSource')||null;
       payload.lead_score = fd.get('leadScore') ? Number(fd.get('leadScore')) : null;
