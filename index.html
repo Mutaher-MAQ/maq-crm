@@ -487,7 +487,7 @@ function mapOpportunityFromDb(r){
     id:r.id, pipelineStage:r.pipeline_stage||'rfq', department:r.department||'', archived:!!r.archived, archivedAt: r.archived_at ? new Date(r.archived_at).getTime() : null,
     customerId:r.customer_id||'', projectName:r.project_name||'', itemProduct:r.item_product||'', assignedTo:r.assigned_to||'',
     leadStatus:r.lead_status||'to_do', leadSource:r.lead_source||'', leadScore:r.lead_score,
-    opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'',
+    opportunityType:r.opportunity_type||'', opportunityNumber:r.opportunity_number||'', expectedQuarter:r.expected_quarter||'', expectedYear:r.expected_year||'',
     rfqNumber:r.rfq_number||'', rfqDate: r.rfq_date ? new Date(r.rfq_date+'T00:00:00').getTime() : null, rfqDateEstimated:!!r.rfq_date_estimated,
     oemReferenceNumber:r.oem_reference_number||'', priority:r.priority||'',
     followUpAction:r.follow_up_action||'', followUpDate: r.follow_up_date ? new Date(r.follow_up_date+'T00:00:00').getTime() : null, dueDate: r.due_date ? new Date(r.due_date+'T00:00:00').getTime() : null, contactMethod:r.contact_method||'', rfqStatus:(r.rfq_status==='awaiting_response' ? 'offer_submitted' : r.rfq_status)||'not_started',
@@ -776,14 +776,15 @@ function exportWorkbook(filename, sheets){
   XLSX.writeFile(wb, filename);
   toast('Exported '+total+' rows in '+sheets.length+' sheets');
 }
-const OPP_EXPORT_HEADERS = ['Opportunity #','Type','Customer','Project','Item/Product','RFQ #','Principal Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Outcome','Lose Reason','Owner','Department','MAQINT FZC','Created','Notes'];
+const OPP_EXPORT_HEADERS = ['CRM Ref #','Type','Customer','Project','Item/Product','RFQ #','Principal Ref','Stage','Priority','Currency','Value (offer or PO)','PO #','CTR #','Job #','PO Date','Principal','Payment Terms','LC Status','Shipment','Payment Status','RFQ Date','Offer Due','Next Follow-Up','Expected Close','Outcome','Lose Reason','Owner','Department','MAQINT FZC','Created','Notes'];
+const expectedCloseText = o => o.expectedQuarter ? (o.expectedQuarter + (o.expectedYear ? ' '+o.expectedYear : '')) : '';
 function oppExportRow(o){
   const isOrder = o.pipelineStage==='order', isLead = o.pipelineStage==='lead';
   const stage = isLead ? ((LEAD_COLUMNS.find(c=>c.id===o.leadStatus)||{}).label||'') : (isOrder ? 'Order' : ((RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||''));
   return [o.opportunityNumber||'', isOrder?'Order':(isLead?'Lead':'RFQ'), customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', stage,
     (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', o.poDate?fmtDate(o.poDate):'',
     (isOrder ? principalName(o.poPrincipalId) : oppPrincipalNames(o))||'', o.paymentTerms||'', isOrder?lcStatusInfo(lcEffective(o)).label:'', isOrder?simpleStatusInfo(o.shipmentStatus).label:'', isOrder&&canSeePayments()?(o.paymentStatus||''):'',
-    o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', o.winLose||'', o.loseReason||'',
+    o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', expectedCloseText(o), o.winLose||'', o.loseReason||'',
     o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.maqintFzc?'Yes':'', o.createdAt?fmtDate(o.createdAt):'', o.notes||''];
 }
 /* Principal-specific Excel formats: some principals want updates on their own tracker sheet.
@@ -863,7 +864,7 @@ function panametricsRows(p){
   const rows = list.map((o,i)=>{
     const c = state.customers.find(x=>x.id===o.customerId);
     return [i+1, c?c.name:'', (c&&c.industry)||'', '', o.itemProduct||'', o.projectName||'', stageOf(o), o.notes||'',
-      (PRIORITIES.find(x=>x.id===o.priority)||{}).label||'', '', '', amountOf(o), ''];
+      (PRIORITIES.find(x=>x.id===o.priority)||{}).label||'', o.expectedQuarter||'', o.expectedYear||'', amountOf(o), ''];
   });
   return {headers, rows, isOrder: list.map(o=>o.pipelineStage==='order')};
 }
@@ -886,7 +887,7 @@ function buildPanametricsPlain(p){
   list.forEach((o,i)=>{
     const c = customer(o);
     aoa.push([i+1, c?c.name:'', (c&&c.industry)||'', '', o.itemProduct||'', o.projectName||'', stageOf(o), o.notes||'',
-      (PRIORITIES.find(x=>x.id===o.priority)||{}).label||'', '', '', amountOf(o), '']);
+      (PRIORITIES.find(x=>x.id===o.priority)||{}).label||'', o.expectedQuarter||'', o.expectedYear||'', amountOf(o), '']);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [6,30,20,18,26,49,24,60,14,14,9,17,17].map(w=>({wch:w}));
@@ -2156,7 +2157,7 @@ function renderOpportunityForm(){
       <div class="form-section-title">RFQ</div>
       <div class="field-row">
         <div class="field"><label>Opportunity Type</label><select name="opportunityType"><option value="">—</option>${OPPORTUNITY_TYPES.map(t=>`<option value="${t.id}" ${t.id===o.opportunityType?'selected':''}>${t.label}</option>`).join('')}</select></div>
-        <div class="field"><label>Opportunity Number</label><input value="${esc(o.opportunityNumber||'Assigned when saved')}" readonly style="background:var(--bg,#f4f6fa);color:#5d6b82;"></div>
+        <div class="field"><label>CRM Reference Number</label><input value="${esc(o.opportunityNumber||'Assigned when saved')}" readonly style="background:var(--bg,#f4f6fa);color:#5d6b82;"></div>
       </div>
       <div class="field"><label>Principal (OEM)</label><select name="principalIds">${principalOptions(selectedPrincipals[0])}</select></div>
       <div class="field-row">
@@ -2174,6 +2175,10 @@ function renderOpportunityForm(){
         ${!isOrder ? `<div class="field"><label>Offer Due Date</label><input name="dueDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${isoDay(o.dueDate)}"></div>` : ''}
         <div class="field"><label>Next Follow-Up Date</label><input name="followUpDate" type="text" data-date inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10" autocomplete="off" value="${followUpDateVal}"></div>
       </div>
+      ${!isOrder ? `<div class="field-row">
+        <div class="field"><label>Expected Close Quarter</label><select name="expectedQuarter"><option value="">—</option>${['Q1','Q2','Q3','Q4'].map(q=>`<option value="${q}" ${q===o.expectedQuarter?'selected':''}>${q}</option>`).join('')}</select></div>
+        <div class="field"><label>Expected Close Year</label><input name="expectedYear" type="number" min="2020" max="2100" step="1" placeholder="${new Date().getFullYear()}" value="${esc(o.expectedYear)}"></div>
+      </div>` : ''}
       ${!isOrder ? `<div class="field-row">
         <div class="field"><label>Offer Currency</label><select name="offerCurrency"><option value="">—</option>${CURRENCIES.map(c=>`<option value="${c}" ${c===o.currency?'selected':''}>${c}</option>`).join('')}</select></div>
         <div class="field"><label>Offer Value</label><input name="offerValue" type="number" min="0" step="0.01" value="${o.poValue?esc(o.poValue):''}"></div>
@@ -2277,8 +2282,8 @@ function attachGlobalHandlers(){
   });
   bind('export-rfqs', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='rfq').sort((a,b)=>b.createdAt-a.createdAt);
-    exportToExcel('rfqs.xlsx', ['Opportunity #','Customer','Project','Item/Product','RFQ #','Principal Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
-      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', (RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'', (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label||'', o.winLose||'', o.loseReason||'', oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
+    exportToExcel('rfqs.xlsx', ['CRM Ref #','Customer','Project','Item/Product','RFQ #','Principal Ref','Stage','Priority','Offer Currency','Offer Value','RFQ Date','Offer Due','Next Follow-Up','Expected Close','Follow-Up Action','Outcome','Lose Reason','Principal','Owner','Department','Notes'],
+      rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.projectName||'', o.itemProduct||'', o.rfqNumber||'', o.oemReferenceNumber||'', (RFQ_COLUMNS.find(c=>c.id===o.rfqStatus)||{}).label||'', (PRIORITIES.find(p=>p.id===o.priority)||{}).label||'', o.currency||'', o.poValue||'', o.rfqDate?fmtDate(o.rfqDate):'', o.dueDate?fmtDate(o.dueDate):'', o.followUpDate?fmtDate(o.followUpDate):'', expectedCloseText(o), (FOLLOW_UP_ACTIONS.find(x=>x.id===o.followUpAction)||{}).label||'', o.winLose||'', o.loseReason||'', oppPrincipalNames(o), o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||'']));
   });
   bind('export-payments', ()=>{
     const rows = state.opportunities.filter(o=>o.pipelineStage==='order' && o.winLose==='won');
@@ -2338,7 +2343,7 @@ function attachGlobalHandlers(){
   bind('export-orders', ()=>{
     const rows = orderRows();
     exportToExcel('orders.xlsx',
-      ['Opportunity #','Customer','Item/Product','PO #','CTR #','Job #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
+      ['CRM Ref #','Customer','Item/Product','PO #','CTR #','Job #','Principal','Currency','PO Value','Payment Terms','LC Status','Shipment Status','Payment Status','Assigned To','Department','Notes'],
       rows.map(o=>[o.opportunityNumber||'', customerName(o.customerId), o.itemProduct||o.projectName||'', o.poNumber||'', o.ctrNumber||'', o.jobNumber||'', principalName(o.poPrincipalId), o.currency||'', o.poValue||'', o.paymentTerms||'', lcStatusInfo(lcEffective(o)).label, simpleStatusInfo(o.shipmentStatus).label, canSeePayments()?(o.paymentStatus||''):'', o.assignedTo?profileName(o.assignedTo):'', o.department||'', o.notes||''])
     );
   });
@@ -2674,6 +2679,8 @@ function attachGlobalHandlers(){
       payload.lose_reason = fd.get('loseReason').trim()||null;
       if(stage !== 'order'){
         payload.rfq_status = fd.get('rfqStatus');
+        payload.expected_quarter = fd.get('expectedQuarter')||null;
+        payload.expected_year = fd.get('expectedYear') ? parseInt(fd.get('expectedYear'),10) : null;
         // The offer value is stored in the same columns as the PO value, so it carries over when the RFQ is won
         payload.currency = fd.get('offerCurrency')||null;
         payload.po_value = fd.get('offerValue') ? Number(fd.get('offerValue')) : null;
