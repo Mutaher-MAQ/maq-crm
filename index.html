@@ -790,8 +790,81 @@ function oppExportRow(o){
 /* Principal-specific Excel formats: some principals want updates on their own tracker sheet.
    Add an entry here (match = part of the principal's name) to give that principal its own layout. */
 const PRINCIPAL_TEMPLATES = [
-  { match: /panametrics/i, label: 'Panametrics tracker', build: buildPanametricsTracker }
+  { match: /panametrics/i, label: 'Panametrics tracker', build: buildPanametricsTracker },
+  { match: /bureau\s*veritas/i, label: 'Bureau Veritas tracker', build: buildBureauVeritasTracker }
 ];
+// Midnight UTC of a local calendar day, so Excel shows the same date everywhere
+function excelDay(ts){ const d = new Date(ts); return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); }
+function ordinalDay(n){ const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); }
+// Pull "Label: value" lines back out of a record's notes (the Bureau Veritas import stores them there)
+function noteField(notes, label){ const m = new RegExp('^'+label+':\\s*(.+)$','mi').exec(notes||''); return m ? m[1].trim() : ''; }
+function firstNameOf(id){
+  const p = state.profiles.find(x=>x.id===id); if(!p) return '';
+  const raw = (p.fullName && !p.fullName.includes('@')) ? p.fullName : String(p.email||'').split('@')[0].replace(/[._]+/g,' ');
+  const parts = raw.trim().split(/\s+/); const f = (/^abdul$/i.test(parts[0]) && parts[1]) ? parts[1] : parts[0];
+  return f ? f.charAt(0).toUpperCase()+f.slice(1) : '';
+}
+// Bureau Veritas "Open Opportunities Tracker": same columns and look as the sheet BV/Saad use.
+async function buildBureauVeritasTracker(p){
+  try{
+    if(typeof ExcelJS==='undefined') await loadScriptOnce('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js');
+  }catch(e){ toast('Styled export unavailable offline, try again when connected'); return; }
+  const r = principalRecords(p.id);
+  const list = [].concat(r.rfqs, r.lost, r.orders).sort((a,b)=>((a.rfqDate||a.createdAt||0)-(b.rfqDate||b.createdAt||0)));
+  const now = new Date();
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const closingOf = o => (o.pipelineStage==='order' || o.winLose==='won') ? 'Won'
+    : (o.winLose==='lost' ? (o.rfqStatus==='not_interested' ? 'Closed/Abandon' : 'Closed/Lost')
+    : (o.rfqStatus==='not_interested' ? 'Closed/Abandon' : (o.expectedQuarter||'')));
+  const valueOf = o => !o.poValue ? 'Pending' : ((!o.currency || o.currency==='Euro') ? Number(o.poValue) : `${o.currency} ${Number(o.poValue).toLocaleString('en-US')}`);
+  const rows = list.map((o,i)=>{
+    const notes = o.notes||'';
+    const structured = /^Source: BV tracker row/m.test(notes);
+    const line = (/^Bureau Veritas\s*-\s*(.+)$/i.exec(o.projectName||'')||[])[1] || '';
+    const lastAct = state.activities.filter(a=>a.opportunityId===o.id).sort((a,b)=>b.timestamp-a.timestamp)[0];
+    return [
+      i+1, excelDay(o.rfqDate||o.createdAt||Date.now()), customerName(o.customerId)==='—'?'':customerName(o.customerId), o.itemProduct||o.projectName||'',
+      o.oemReferenceNumber||'Pending', noteField(notes,'BV opportunity #')||'Pending', valueOf(o), line,
+      structured ? noteField(notes,'BV comments') : notes,
+      noteField(notes,'BV contact'), noteField(notes,'In BV Salesforce')||'No', closingOf(o),
+      lastAct ? lastAct.note : noteField(notes,'Status update'), firstNameOf(o.assignedTo)
+    ];
+  });
+  const headers = ['S.No','Date','Customer Name','Description','BVI Ref#','Opportunity Number','Oppty. Value Euro','BV Product Line','Comments','BV Point of Contacts','Sales Force','Closing Date','Status update as of '+ordinalDay(now.getDate())+' '+MONTHS[now.getMonth()],'MAQ Point of Contact'];
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Opportunties', {views:[{state:'frozen', ySplit:2, zoomScale:78}]});
+  ws.columns = [5.5,20.5,37,42.5,31,24,20,20,48.5,30,9,16.5,43.7,37].map(w=>({width:w}));
+  const thin = {style:'thin'}, box = {top:thin,left:thin,bottom:thin,right:thin};
+  const PURPLE = {type:'pattern', pattern:'solid', fgColor:{argb:'FF2C1092'}};
+  const GREY = {type:'pattern', pattern:'solid', fgColor:{argb:'FFE7E6E6'}};
+  const ACCOUNTING = '_(* #,##0.00_);_(* \\(#,##0.00\\);_(* "-"??_);_(@_)';
+  const t = ws.getCell('A1'); t.value = 'Bureau Veritas Pakistan - Open Opportunities  - Tracker'; t.font = {name:'Calibri', size:12, bold:true};
+  headers.forEach((h,i)=>{
+    const c = ws.getRow(2).getCell(i+1); c.value = h; c.fill = PURPLE; c.border = box;
+    c.font = {name:'Calibri', size:12, bold:true, color:{argb:'FFFFFFFF'}};
+    c.alignment = {horizontal: (i<2||i===5)?'left':'center', vertical:'middle', wrapText:true};
+  });
+  ws.getRow(2).height = 31;
+  rows.forEach((row,ri)=>{
+    const xr = ws.getRow(ri+3);
+    const lines = Math.max(1, Math.ceil(String(row[3]).length/42), Math.ceil(String(row[8]).length/48), Math.ceil(String(row[12]).length/44), Math.ceil(String(row[2]).length/36));
+    xr.height = Math.max(31, lines*16.5);
+    row.forEach((v,ci)=>{
+      const c = xr.getCell(ci+1); c.value = (v===''||v===null) ? null : v; c.fill = GREY; c.border = box;
+      c.font = {name:'Calibri', size:12};
+      c.alignment = {horizontal: ci===6 ? 'right' : 'left', vertical:'middle', wrapText:true};
+      if(ci===1) c.numFmt = 'dd/mm/yyyy';
+      if(ci===6 && typeof v==='number') c.numFmt = ACCOUNTING;
+    });
+  });
+  ws.autoFilter = {from:'A2', to:'N'+(rows.length+2)};
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download = 'MAQ Opportunities Tracker BV.xlsx';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('Exported '+rows.length+' row'+(rows.length!==1?'s':'')+' in the Bureau Veritas format');
+}
 function principalTemplate(p){ return p ? PRINCIPAL_TEMPLATES.find(t=>t.match.test(p.name||'')) : null; }
 function loadScriptOnce(src){
   return new Promise((resolve,reject)=>{
@@ -818,7 +891,7 @@ async function buildPanametricsTracker(p){
   ws.getRow(1).height = 30;
   ws.mergeCells('A1:B1'); ws.mergeCells('E1:M1');
   ws.getCell('A1').value = 'Date ';
-  ws.getCell('C1').value = new Date(now.getFullYear(), now.getMonth(), now.getDate()); ws.getCell('C1').numFmt = 'dd/mm/yyyy';
+  ws.getCell('C1').value = excelDay(now.getTime()); ws.getCell('C1').numFmt = 'dd/mm/yyyy';
   ws.getCell('E1').value = 'Panametrics Tracker '+now.getFullYear();
   for(let c=1;c<=13;c++){
     const cell = ws.getCell(1,c);
