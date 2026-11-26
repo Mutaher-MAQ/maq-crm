@@ -1288,7 +1288,8 @@ function renderDashboard(){
   const lost = state.opportunities.filter(o=>o.winLose==='lost');
   const wonByCurrency = sumByCurrency(won);
   const orders = state.opportunities.filter(o=>o.pipelineStage==='order');
-  const actionNeeded = orders.filter(o=>!o.paymentTerms || lcEffective(o)==='pending' || o.shipmentStatus==='pending');
+  // Service orders (e.g. Bureau Veritas) have no shipment or LC, so only product orders are flagged for terms / LC / shipment here.
+  const actionNeeded = orders.filter(o=>!isServiceOpp(o) && (!o.paymentTerms || lcEffective(o)==='pending' || o.shipmentStatus==='pending'));
   const receivable = orders.filter(o=>o.paymentStatus!=='received');
   const receivableByCurrency = sumByCurrency(receivable);
 
@@ -1335,7 +1336,7 @@ function renderDashboard(){
           <div class="task-title">${esc(o.projectName||o.itemProduct||'Order')}<div class="sub-text">${esc(customerName(o.customerId))}</div></div>
           ${!o.paymentTerms ? '<span class="badge badge-amber">Payment terms?</span>' : ''}
           ${lcEffective(o)==='pending' ? '<span class="badge badge-amber">LC pending</span>' : ''}
-          ${o.shipmentStatus==='pending' ? `<span class="badge badge-amber">${isServiceOpp(o)?'Delivery pending':'Shipment pending'}</span>` : ''}
+          ${o.shipmentStatus==='pending' ? `<span class="badge badge-amber">Shipment pending</span>` : ''}
         </div>`).join('') : `<div class="sub-text">Nothing pending — all orders are clear 🎉</div>`}
     </div>
     <div class="panel">
